@@ -10,6 +10,8 @@ HYDRA is an interactive 3D simulator of a real Indian neighbourhood (Gurugram, C
 - re-run the *same* storm and compare before and after
 - let HYDRA's optimizer spend the budget for you, and pit it against spending the same money without a plan
 
+> Project direction, status and next steps: [DIRECTION.md](DIRECTION.md).
+
 > **Thesis, shown on screen:** the right infrastructure in the right places reduces monsoon flood damage far more than the same budget spent evenly.
 
 | Neighbourhood, storm, budget | Flood-impact cut: HYDRA plan | Flood-impact cut: even spread (avg of 3) | Homes kept dry (HYDRA vs even spread) |
