@@ -9,7 +9,7 @@ import { Buildings } from './Buildings';
 import { Drains, Rain, Water, rainRate } from './flood/Water';
 import { Interventions } from './flood/Interventions';
 import { Markers } from './flood/Markers';
-import { HeatInterventions, HeatLights, HeatMarkers, HeatOverlay, Trees } from './heat/HeatLayer';
+import { HeatInterventions, HeatLights, HeatMarkers, HeatOverlay, SiteTrees, Trees } from './heat/HeatLayer';
 import { useHeat } from '../heatStore';
 import { Effects } from './Effects';
 
@@ -116,6 +116,7 @@ export function Scene() {
           <Buildings />
           {mode === 'flood' && (
             <>
+              <SiteTrees />
               <Drains />
               <Interventions />
               <Water />

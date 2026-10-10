@@ -1,7 +1,7 @@
 // Heat mode in 3D: sun light for the chosen hour, the exposure / shade map on the ground, trees, shade structures,
 // placement previews and the pedestrian places (bus stops, markets, gates, parks) coloured by their exposure index.
 import { Html } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useHeat } from '../../heatStore';
@@ -90,8 +90,8 @@ const TRUNK = new THREE.CylinderGeometry(0.25, 0.35, 1, 6).translate(0, 0.5, 0);
 const CROWN = new THREE.IcosahedronGeometry(1, 1);
 const box = new THREE.BoxGeometry(1, 1, 1);
 
-interface TreeSpec { x: number; y: number; z: number; h: number; r: number; synthetic: boolean; planned: boolean }
-function treeSpecs(g: Grid, hs: HeatSite, plan: HeatIntervention[]): TreeSpec[] {
+export interface TreeSpec { x: number; y: number; z: number; h: number; r: number; synthetic: boolean; planned: boolean }
+export function treeSpecs(g: Grid, hs: Pick<HeatSite, 'trees'>, plan: HeatIntervention[]): TreeSpec[] {
   const h = half(g), at = (x: number, z: number) => g.z[Math.min(g.n - 1, Math.max(0, Math.floor(z / g.dx) * g.nx + Math.floor(x / g.dx)))] * VE;
   return [
     ...hs.trees.map(t => ({ x: t.x - h, y: at(t.x, t.z), z: t.z - h, h: t.h, r: t.r, synthetic: t.synthetic, planned: false })),
@@ -103,23 +103,51 @@ export function Trees() {
   const grid = useStore(s => s.grid)!, sources = useStore(s => s.overlay === 'sources');
   const hs = useHeat(s => s.heat), plan = useHeat(s => s.plan);
   const specs = useMemo(() => (hs ? treeSpecs(grid, hs, plan) : []), [grid, hs, plan]);
+  return <TreeField specs={specs} sources={sources} />;
+}
+
+const LEAF = ['#4f6b3a', '#5a7a42', '#46613a', '#64804a', '#56703f'];
+
+/** Instanced trees: tapered trunks, faceted crowns with per-tree turn, squash and a muted two-tone green. */
+export function TreeField({ specs, sources }: { specs: TreeSpec[]; sources: boolean }) {
   const { trunks, crowns } = useMemo(() => {
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), trunks = new THREE.InstancedMesh(TRUNK, new THREE.MeshStandardMaterial({ color: '#5b4330', roughness: 1 }), Math.max(1, specs.length));
-    const crowns = new THREE.InstancedMesh(CROWN, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), Math.max(1, specs.length));
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), trunks = new THREE.InstancedMesh(TRUNK, new THREE.MeshStandardMaterial({ color: '#5b4632', roughness: 1 }), Math.max(1, specs.length));
+    const crowns = new THREE.InstancedMesh(CROWN, new THREE.MeshStandardMaterial({ roughness: 0.92, flatShading: true }), Math.max(1, specs.length));
     const col = new THREE.Color();
     specs.forEach((t, k) => {
-      const trunkH = t.h * HEAT_PARAMS.trunkShare + 0.6;
-      m.compose(new THREE.Vector3(t.x, t.y, t.z), q, new THREE.Vector3(1, trunkH, 1)); trunks.setMatrixAt(k, m);
+      const trunkH = t.h * HEAT_PARAMS.trunkShare + 0.6, j = Math.sin(k * 12.9898) * 43758.5453 % 1, jj = Math.abs(j);
+      m.compose(new THREE.Vector3(t.x, t.y, t.z), q.identity(), new THREE.Vector3(1, trunkH, 1)); trunks.setMatrixAt(k, m);
       const ch = t.h * (1 - HEAT_PARAMS.trunkShare);
-      m.compose(new THREE.Vector3(t.x, t.y + trunkH + ch * 0.35, t.z), q, new THREE.Vector3(t.r, ch * 0.62, t.r)); crowns.setMatrixAt(k, m);
-      crowns.setColorAt(k, col.set(t.planned ? '#4ade80' : sources && t.synthetic ? '#c084fc' : ['#3f7d3a', '#4a8a3f', '#2f6b33'][k % 3]));
+      q.setFromEuler(e.set(jj * 0.4, jj * 6.28, (1 - jj) * 0.3));
+      m.compose(new THREE.Vector3(t.x, t.y + trunkH + ch * 0.35, t.z), q, new THREE.Vector3(t.r * (0.92 + 0.16 * jj), ch * (0.56 + 0.12 * jj), t.r * (1.06 - 0.14 * jj))); crowns.setMatrixAt(k, m);
+      if (t.planned) col.set('#4ade80');
+      else if (sources && t.synthetic) col.set('#c084fc');
+      else col.set(LEAF[k % LEAF.length]).offsetHSL(0, 0, (jj - 0.5) * 0.06);
+      crowns.setColorAt(k, col);
     });
     trunks.count = crowns.count = specs.length;
-    for (const x of [trunks, crowns]) { x.castShadow = true; x.raycast = () => {}; x.instanceMatrix.needsUpdate = true; x.computeBoundingSphere(); }
+    for (const x of [trunks, crowns]) { x.castShadow = true; x.receiveShadow = true; x.raycast = () => {}; x.instanceMatrix.needsUpdate = true; x.computeBoundingSphere(); }
     if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
     return { trunks, crowns };
   }, [specs, sources]);
   return <group><primitive object={trunks} /><primitive object={crowns} /></group>;
+}
+
+const treeCache = new Map<string, Promise<Pick<HeatSite, 'trees'>>>();
+
+/** Flood mode shows the neighbourhood's real trees too: only the tree list is fetched, no heat simulation runs. */
+export function SiteTrees() {
+  const grid = useStore(s => s.grid)!, sources = useStore(s => s.overlay === 'sources');
+  const [hs, setHs] = useState<Pick<HeatSite, 'trees'> | null>(null);
+  useEffect(() => {
+    const id = grid.site.id;
+    if (!treeCache.has(id)) treeCache.set(id, fetch(`${import.meta.env.BASE_URL}data/${id}.heat.json`).then(r => r.json()).catch(() => ({ trees: [] })));
+    let live = true;
+    treeCache.get(id)!.then(x => { if (live) setHs(x); });
+    return () => { live = false; };
+  }, [grid]);
+  const specs = useMemo(() => (hs ? treeSpecs(grid, hs, []) : []), [grid, hs]);
+  return <TreeField specs={specs} sources={sources} />;
 }
 
 function Shade({ grid, cells, color, opacity = 1 }: { grid: Grid; cells: number[]; color: string; opacity?: number }) {

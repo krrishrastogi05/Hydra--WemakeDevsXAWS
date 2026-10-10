@@ -1,4 +1,4 @@
-// Terrain block: a painted base map on the exaggerated DEM, diorama skirt showing soil layers, risk overlay.
+// Terrain block: a painted base map (soft land cover, OSM roads at their width) on the exaggerated DEM, diorama skirt, risk overlay.
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useStore } from '../store';
@@ -8,8 +8,8 @@ import { VE, half } from './geo';
 import { useTools } from './useTools';
 
 const ROAD_FILL: Record<string, string> = {
-  motorway: '#2f3238', trunk: '#30333a', primary: '#34373d', secondary: '#383b41', tertiary: '#45474c',
-  residential: '#6c6a65', unclassified: '#6c6a65', living_street: '#77746d', service: '#7f7b73', pedestrian: '#8a857b', track: '#8f7a5e',
+  motorway: '#2e3033', trunk: '#303235', primary: '#35373a', secondary: '#3a3c3f', tertiary: '#424447',
+  residential: '#535250', unclassified: '#535250', living_street: '#5b5a57', service: '#63615d', pedestrian: '#6e6b66', track: '#75695a',
 };
 const RANK: Record<string, number> = { track: 1, pedestrian: 1, service: 2, living_street: 3, residential: 4, unclassified: 4, tertiary: 5, secondary: 6, primary: 7, trunk: 8, motorway: 9 };
 
@@ -30,51 +30,56 @@ export function terrainGeometry(g: Grid) {
   return geo;
 }
 
-function shade(hex: string, k: number) {
-  const c = new THREE.Color(hex);
-  c.offsetHSL(0, 0, k);
-  return `#${c.getHexString()}`;
+/** A tileable speckle so open ground and paving read as material, not flat paint. */
+function grain(ctx: CanvasRenderingContext2D) {
+  const t = document.createElement('canvas');
+  t.width = t.height = 256;
+  const c = t.getContext('2d')!, img = c.createImageData(256, 256);
+  for (let i = 0; i < 256 * 256; i++) { const v = (Math.sin(i * 12.9898 + (i >> 8) * 78.233) * 43758.5453) % 1; const g = 128 + Math.round(Math.abs(v) * 60 - 30); img.data.set([g, g, g, 255], i * 4); }
+  c.putImageData(img, 0, 0);
+  return ctx.createPattern(t, 'repeat')!;
 }
 
-function baseMap(g: Grid) {
-  const S = 2048, cnv = document.createElement('canvas');
+function baseMap(g: Grid, S: number) {
+  const cnv = document.createElement('canvas');
   cnv.width = cnv.height = S;
-  const ctx = cnv.getContext('2d')!, px = S / (g.nx * g.dx), cs = g.dx * px;
-  const ground = g.site.groundColor;
-  ctx.fillStyle = ground; ctx.fillRect(0, 0, S, S);
-  // cells: tinted ground, gardens, yards, ponds; plot shadow under buildings; gentle noise
+  const ctx = cnv.getContext('2d')!, px = S / (g.nx * g.dx);
+  // a little greyer than the site's soil colour, so data colours stay the brightest things on the map
+  const ground = `#${new THREE.Color(g.site.groundColor).lerp(new THREE.Color('#a39f97'), 0.5).getHexString()}`;
+  // 1. land cover at grid resolution, upscaled with smoothing: soft edges instead of 5 m staircases.
+  //    Road cells (what the engine treats as road) are painted here too, so the engine's roads still show underneath.
+  const lo = document.createElement('canvas');
+  lo.width = g.nx; lo.height = g.ny;
+  const lc = lo.getContext('2d')!, img = lc.createImageData(g.nx, g.ny), col = new THREE.Color();
   for (let i = 0; i < g.n; i++) {
-    const c = i % g.nx, r = (i / g.nx) | 0, cv = g.cover[i], j = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-    const col = cv === COVER.GREEN ? shade('#6d9450', j * 0.05) : cv === COVER.PAVED ? shade('#a6a198', j * 0.03) : cv === COVER.WATER ? '#3d6f95' : cv === COVER.CHANNEL ? '#2f5f86'
-      : cv === COVER.BUILDING ? shade(ground, -0.08) : shade(ground, j * 0.035);
-    ctx.fillStyle = col; ctx.fillRect(c * cs, r * cs, cs + 0.6, cs + 0.6);
+    const cv = g.cover[i], j = ((Math.sin(i * 12.9898) * 43758.5453) % 1) * 0.5;
+    if (cv === COVER.GREEN) col.set('#6f8a55').offsetHSL(0, 0, j * 0.05);
+    else if (cv === COVER.PAVED) col.set('#a7a39b').offsetHSL(0, 0, j * 0.03);
+    else if (cv === COVER.WATER) col.set('#3b5f78');
+    else if (cv === COVER.CHANNEL) col.set('#34566e');
+    else if (cv === COVER.ROAD) col.set(g.road[i] >= 0 ? ROAD_FILL[g.site.roads[g.road[i]].cls] ?? '#535250' : '#535250');
+    else if (cv === COVER.BUILDING) col.set(ground).offsetHSL(0, -0.05, -0.1);
+    else col.set(ground).offsetHSL(0, 0, j * 0.04);
+    const hx = col.getHex();   // sRGB bytes (Color stores linear values internally)
+    img.data.set([hx >> 16 & 255, hx >> 8 & 255, hx & 255, 255], i * 4);
   }
-  // roads are painted from the simulation grid's road cells, so what you see is exactly what the engine and the
-  // inspector treat as road: continuous strokes between neighbouring road cells (round joins), kerb first, then surface
-  const fillOf = (i: number) => ROAD_FILL[(g.road[i] >= 0 ? g.site.roads[g.road[i]].cls : 'residential')] ?? '#6c6a65';
-  const isRoad = (i: number) => g.cover[i] === COVER.ROAD;
-  const strokes = new Map<string, Path2D>();
-  const add = (fill: string, i: number, j: number) => {
-    if (!strokes.has(fill)) strokes.set(fill, new Path2D());
-    const p = strokes.get(fill)!;
-    p.moveTo(((i % g.nx) + 0.5) * cs, (((i / g.nx) | 0) + 0.5) * cs);
-    p.lineTo(((j % g.nx) + 0.5) * cs, (((j / g.nx) | 0) + 0.5) * cs);
-  };
-  for (let i = 0; i < g.n; i++) {
-    if (!isRoad(i)) continue;
-    const c = i % g.nx, r = (i / g.nx) | 0, f = fillOf(i);
-    add(f, i, i);   // a dot, so isolated cells still show
-    if (c + 1 < g.nx && isRoad(i + 1)) add(f, i, i + 1);
-    if (r + 1 < g.ny && isRoad(i + g.nx)) add(f, i, i + g.nx);
-  }
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const [fill, p] of strokes) { ctx.strokeStyle = shade(fill, -0.09); ctx.lineWidth = cs * 1.16; ctx.stroke(p); }
-  for (const [fill, p] of strokes) { ctx.strokeStyle = fill; ctx.lineWidth = cs * 1.0; ctx.stroke(p); }
+  lc.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(lo, 0, 0, S, S);
+  ctx.globalAlpha = 0.07; ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, S, S);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  // 2. crisp roads from the OSM centre lines at their mapped width, kerb first, then surface, then markings.
+  //    They sit within half a grid cell (2.5 m) of the engine's road cells painted underneath.
   const roads = [...g.site.roads].sort((a, b) => (RANK[a.cls] ?? 0) - (RANK[b.cls] ?? 0));
   const path = (pts: [number, number][]) => { ctx.beginPath(); pts.forEach(([x, z], k) => k ? ctx.lineTo(x * px, z * px) : ctx.moveTo(x * px, z * px)); };
+  const width = (rd: (typeof roads)[number]) => Math.max(3.5, rd.width || 5);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const rd of roads) { path(rd.pts); ctx.strokeStyle = '#8e8a83'; ctx.lineWidth = (width(rd) + 1.2) * px; ctx.stroke(); }
+  for (const rd of roads) { path(rd.pts); ctx.strokeStyle = ROAD_FILL[rd.cls] ?? '#535250'; ctx.lineWidth = width(rd) * px; ctx.stroke(); }
   for (const rd of roads) {
     if ((RANK[rd.cls] ?? 0) < 5) continue;
-    path(rd.pts); ctx.setLineDash([3 * px, 4 * px]); ctx.strokeStyle = 'rgba(240,232,210,0.55)'; ctx.lineWidth = 0.25 * px; ctx.stroke(); ctx.setLineDash([]);
+    path(rd.pts); ctx.setLineDash([3 * px, 4 * px]); ctx.strokeStyle = 'rgba(236,230,214,0.6)'; ctx.lineWidth = 0.22 * px; ctx.stroke(); ctx.setLineDash([]);
   }
   const tex = new THREE.CanvasTexture(cnv);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -102,7 +107,7 @@ function riskMap(g: Grid, maxDepth: Float32Array) {
 /** Vertical walls around the block (soil and rock layers), like a diorama cut. */
 function skirtGeometry(g: Grid) {
   const { nx, ny } = g, h = half(g), bottom = -14, pos: number[] = [], col: number[] = [], idx: number[] = [];
-  const soil = new THREE.Color('#6b4f3a'), rock = new THREE.Color('#3b332d'), top = new THREE.Color('#7f6146');
+  const soil = new THREE.Color('#5c4838'), rock = new THREE.Color('#2f2b28'), top = new THREE.Color('#7a6650');
   const side = (cells: number[], outward: [number, number]) => {
     const base = pos.length / 3;
     cells.forEach((i, k) => {
@@ -126,7 +131,8 @@ export function Terrain() {
   const overlay = useStore(s => (s.mode === 'flood' ? s.overlay : 'none'));
   const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
   const geo = useMemo(() => terrainGeometry(grid), [grid]);
-  const tex = useMemo(() => baseMap(grid), [grid]);
+  const sharp = useStore(s => s.quality === 'high');
+  const tex = useMemo(() => baseMap(grid, sharp ? 4096 : 2048), [grid, sharp]);
   const skirt = useMemo(() => skirtGeometry(grid), [grid]);
   const risk = useMemo(() => (result && overlay === 'risk' ? riskMap(grid, result.maxDepth) : null), [grid, result, overlay]);
   const { terrain } = useTools();
