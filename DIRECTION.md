@@ -80,14 +80,9 @@ The whole engine runs in the browser, so hosting is a static site. An optional b
 |---|---|---|
 | Terrain Tiles on the AWS Registry of Open Data (`elevation-tiles-prod`) | **Done** | Elevation for every city |
 | AWS Amplify Hosting | **Ready** (`amplify.yml` in repo), not yet deployed | Public demo URL |
-<<<<<<< HEAD
-| AWS Lambda + API Gateway + S3 calculation backend | Designed ([BACKEND.md](BACKEND.md)) | Runs every calculation on the server: custom rainfall, a worked calculation per intervention, browser fallback |
-| Amazon Bedrock "ward officer brief" | Not started | Turn the chosen plan into a one-page summary in English and Hindi |
-=======
 | AWS Lambda + API Gateway (HTTP API) | **Built** (`backend/template.yaml`, SAM), not yet deployed | API, plus a worker Lambda for area builds |
 | Amazon DynamoDB | **Built**, not yet deployed | Saved and shared plans (`?plan=<id>` links), area build status |
 | Amazon S3 | **Built**, not yet deployed | Neighbourhoods built on demand ("+ Area": any spot in India from OSM + AWS terrain) |
->>>>>>> origin/feat/backend
 | Amazon S3 + CloudFront | Alternative to Amplify | Same static hosting |
 
 ## 6. Next steps, in priority order
