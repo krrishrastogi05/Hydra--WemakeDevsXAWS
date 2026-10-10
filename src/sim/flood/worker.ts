@@ -8,7 +8,7 @@ import type { Intervention, SimOptions, SimResult } from './types';
 
 let grid: Grid | null = null;
 const post = (msg: unknown, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(msg, transfer);
-const buffers = (r: SimResult) => [r.frames, r.drainFrames, r.maxDepth, r.timeOver, r.surcharge, r.doorstep, r.throughVol, r.drainPeak, r.drainCap]
+const buffers = (r: SimResult) => [r.frames, r.drainFrames, r.maxDepth, r.timeOver, r.surcharge, r.doorstep, r.throughVol, r.drainPeak, r.drainCap, ...(r.live ? Object.values(r.live) : [])]
   .filter((a): a is NonNullable<typeof a> => !!a).map(a => a.buffer as ArrayBuffer);
 
 self.onmessage = (e: MessageEvent) => {

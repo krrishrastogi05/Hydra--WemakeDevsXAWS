@@ -10,7 +10,9 @@ export const SERIES = {
 export type SeriesKey = keyof typeof SERIES;
 
 export function Legend({ keys }: { keys: SeriesKey[] }) {
-  return <div className="legend-row">{keys.map(k => <span key={k}><i style={{ background: SERIES[k].color }} />{SERIES[k].name}</span>)}</div>;
+  return <div className="legend-row">{keys.map(k => (
+    <span key={k}><i style={k === 'none' ? { background: 'none', border: `1.5px dashed ${SERIES[k].color}` } : { background: SERIES[k].color }} />{SERIES[k].name}</span>
+  ))}</div>;
 }
 
 export interface BarRow { label: string; hint?: string; values: Partial<Record<SeriesKey, number>>; range?: Partial<Record<SeriesKey, [number, number]>>; fmt: (v: number) => string; better?: 'lower' | 'higher' }
@@ -40,7 +42,9 @@ export function CompareBars({ rows, keys }: { rows: BarRow[]; keys: SeriesKey[] 
               return (
                 <g key={k} onMouseMove={e => setTip({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY, body: <><b>{r.label}</b><br />{SERIES[k].name}: {r.fmt(v)}{rg ? <><br />range of 3 plans: {r.fmt(rg[0])} – {r.fmt(rg[1])}</> : null}</> })}>
                   <rect x={labelW} y={by - 2} width={W - 60} height={barH + 4} fill="transparent" />
-                  <path d={`M${labelW} ${by} h${w - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h${-(w - 4)} z`} fill={SERIES[k].color} />
+                  {/* "no action" reads as a hollow reference bar, not a competing choice: never color alone */}
+                  <path d={`M${labelW} ${by} h${w - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h${-(w - 4)} z`}
+                    fill={k === 'none' ? 'none' : SERIES[k].color} stroke={k === 'none' ? SERIES[k].color : 'none'} strokeWidth={k === 'none' ? 1.5 : 0} strokeDasharray={k === 'none' ? '3 2' : undefined} />
                   {rg && <line x1={labelW + (rg[0] / max) * (W - labelW - 70)} x2={labelW + (rg[1] / max) * (W - labelW - 70)} y1={by + barH / 2} y2={by + barH / 2} className="c-range" />}
                   <text x={labelW + w + 6} y={by + barH - 1} className="c-val">{r.fmt(v)}</text>
                 </g>
@@ -77,7 +81,8 @@ export function LineSeries({ series, unit, fmt, xLabel = 'minutes after rain sta
         {series.map(s => {
           let d = '';
           for (let i = 0; i < s.xs.length; i++) d += `${i ? 'L' : 'M'}${sx(s.xs[i]).toFixed(1)} ${sy(s.ys[i]).toFixed(1)}`;
-          return <path key={s.key} d={d} fill="none" stroke={SERIES[s.key].color} strokeWidth={2} strokeLinejoin="round" />;
+          // "no action" is a reference baseline, not a competing choice: dashed, so identity never rests on its muted colour alone
+          return <path key={s.key} d={d} fill="none" stroke={SERIES[s.key].color} strokeWidth={2} strokeLinejoin="round" strokeDasharray={s.key === 'none' ? '5 3' : undefined} />;
         })}
         {hx != null && <line x1={sx(hx)} x2={sx(hx)} y1={T} y2={H - B} className="c-cross" />}
         {hx != null && series.map(s => { const i = at(s, hx); return <circle key={s.key} cx={sx(s.xs[i])} cy={sy(s.ys[i])} r={4} fill={SERIES[s.key].color} stroke="#121b26" strokeWidth={2} />; })}

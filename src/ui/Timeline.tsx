@@ -64,7 +64,7 @@ export function Inspector() {
   // what is under the pointer always wins; a pinned (clicked) item shows when the pointer is off the map
   const hovered = s.hover ? (s.hover.building >= 0 ? { kind: 'building' as const, building: s.hover.building } : s.hover.cell >= 0 ? { kind: 'cell' as const, cell: s.hover.cell } : null) : null;
   const target = hovered ?? s.selection;
-  if (!target) return <div className="inspector muted">Hover the map to inspect a street, drain or building. Click to pin.</div>;
+  if (!target) return <div className="inspector muted">Hover the map to inspect a street, drain or building. Click to pin.<br /><small>Drag to rotate · Shift-drag or right-drag to pan · Hold Space and move the mouse to pan · Scroll to zoom</small></div>;
   const plan = s.current && s.currentKey ? s.current : null, pinned = !hovered && !!s.selection;
   const close = pinned ? <button className="x" onClick={() => useStore.setState({ selection: null })} aria-label="Unpin"><Icon name="close" size={14} /></button> : null;
   const cmp = (label: string, a: number, b: number | null, fmt: (v: number) => string, lowerBetter = true) => (

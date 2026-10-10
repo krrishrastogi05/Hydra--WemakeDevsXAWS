@@ -7,7 +7,6 @@ import { SidePanel } from './ui/Panel';
 import { Inspector, Timeline } from './ui/Timeline';
 import { useHeat } from './heatStore';
 import { HeatInspector, HeatTimeline } from './ui/heat/HeatTimeline';
-import { DAY_START } from './sim/heat/model';
 
 const KEYS: Record<string, Tool> = { '1': 'drain', '2': 'garden', '3': 'rwh', '4': 'pit', '5': 'desilt', v: 'inspect', x: 'erase' };
 const HEAT_KEYS: Record<string, Tool> = { '1': 'tree', '2': 'canopy', '3': 'walkway', '4': 'coolroof', v: 'inspect', x: 'erase' };
@@ -28,11 +27,9 @@ export default function App() {
       else if (k === 'escape') useStore.setState({ tool: 'inspect', draft: null, selection: null });
       else if (k === 'h') s.setMode(heat ? 'flood' : 'heat');
       else if (heat) {
-        if (k === ' ') { e.preventDefault(); useHeat.setState({ playing: !h.playing, summary: false, ...(h.summary ? { hour: DAY_START } : {}) }); }
-        else if (k === 'p') useHeat.setState({ summary: !h.summary, playing: false });
+        if (k === 'p') useHeat.setState({ summary: !h.summary, playing: false });
         else if (k === 'r' && !h.running && h.plan.length) h.runPlan(true);
       }
-      else if (k === ' ') { e.preventDefault(); useStore.setState({ playing: !s.playing, peak: false, ...(s.peak ? { time: 0 } : {}) }); }
       else if (k === 'p') useStore.setState({ peak: !s.peak, playing: false });
       else if (k === 'r' && !s.running) { if (s.plan.length) s.runPlan(true); else useStore.setState({ time: 0, playing: true, peak: false }); }
     };

@@ -264,6 +264,35 @@ export function simulate(g: Grid, ivs: Intervention[], opt: SimOptions): SimResu
   const w = new Float64Array(n), through = new Float32Array(n), drainPeak = new Float32Array(n);
   const lakeSpill = new Float32Array(lakes.length), lakeInflow = new Float32Array(lakes.length);
 
+  // what the storm is doing at each frame, by the same rules as the end-of-event metrics below (only for playback runs)
+  const rainCumSeries = new Float32Array(nFrames), wetAreaSeries = new Float32Array(nFrames), roadCutSeries = new Float32Array(nFrames);
+  const homesSeries = new Float32Array(nFrames), residentsSeries = new Float32Array(nFrames), overflowSeries = new Float32Array(nFrames);
+  const sd = new Float64Array(n);
+  const liveMetrics = (k: number) => {
+    let wet = 0;
+    for (let i = 0; i < n; i++) { sd[i] = land[i] && !garden[i] ? depth[i] - lip[i] : 0; if (sd[i] > DEPTH.wet) wet += A; }
+    let roadKm = 0;
+    g.site.roads.forEach((rd, r) => {
+      const cells = g.roadCells[r];
+      if (!cells.length) return;
+      let cut = 0;
+      for (const c of cells) if (sd[c] > DEPTH.road) cut++;
+      roadKm += rd.length / 1000 * cut / cells.length;
+    });
+    let homes = 0, residents = 0;
+    g.site.buildings.forEach((b, k2) => {
+      const fr = g.frontage[k2];
+      if (!fr.length) return;
+      let ground = 0, top = -Infinity;
+      for (const c of fr) { ground += g.z[c]; if (sd[c] > 0.005) top = Math.max(top, z[c] + sd[c]); }
+      if (top - ground / fr.length > b.plinth) { homes++; residents += b.residents; }
+    });
+    let over = 0;
+    for (const c of net.cells) if (util[c] < 0) over++;
+    rainCumSeries[k] = B.rain / (A * n) * 1000; wetAreaSeries[k] = wet; roadCutSeries[k] = roadKm;
+    homesSeries[k] = homes; residentsSeries[k] = residents; overflowSeries[k] = over * dx;
+  };
+
   let surchargeTot = 0, peakPonded = 0, frame = 0;
   const lakeOfCell = lakeOf;
 
@@ -273,6 +302,7 @@ export function simulate(g: Grid, ivs: Intervention[], opt: SimOptions): SimResu
     if (frame < nFrames) {
       if (frames) { const o = frame * n; for (let i = 0; i < n; i++) frames[o + i] = Math.min(65535, Math.round(depth[i] * 1000)); }
       if (drainFrames) { const o = frame * net.cells.length; net.cells.forEach((c, k) => { drainFrames[o + k] = util[c] < 0 ? 255 : Math.round(Math.min(1, util[c]) * 254); }); }
+      if (keep) liveMetrics(frame);
       frameTimes[frame] = t / 60; rainSeries[frame] = rainNow; pondedSeries[frame] = ponded; frame++;
     }
     return ponded;
@@ -428,7 +458,9 @@ export function simulate(g: Grid, ivs: Intervention[], opt: SimOptions): SimResu
   };
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return {
-    n, nFrames: frame, frames, frameTimes, rainSeries, pondedSeries, drainCells: Int32Array.from(net.cells), drainFrames,
+    n, nFrames: frame, frames, frameTimes, rainSeries, pondedSeries,
+    ...(keep ? { live: { rainMm: rainCumSeries, wetArea: wetAreaSeries, roadKmCut: roadCutSeries, homesFlooded: homesSeries, residents: residentsSeries, drainOverflowM: overflowSeries } } : {}),
+    drainCells: Int32Array.from(net.cells), drainFrames,
     maxDepth: maxD, timeOver, surcharge, doorstep, drainDown: Int32Array.from(net.cells.map(c => down[c])),
     throughVol: through, drainPeak, drainCap: Float32Array.from(cap), lakeSpill, lakeInflow,
     metrics, budget, hotspots: findHotspots(g, maxD, garden, land, doorstep, hw), cost: planCost(g, ivs), runtimeMs: now - t0,

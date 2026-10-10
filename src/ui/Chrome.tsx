@@ -11,6 +11,11 @@ import { fmtINR } from '../sim/grid';
 import { CATALOG, STORMS, planCost } from '../sim/flood/model';
 import type { InterventionType } from '../sim/flood/types';
 
+/** Secondary tab strip inside a panel tab, for splitting a long data view into short, scannable sections. */
+export function SubTabs<K extends string>({ tabs, active, onChange }: { tabs: readonly { id: K; label: string }[]; active: K; onChange: (id: K) => void }) {
+  return <div className="subtabs">{tabs.map(t => <button key={t.id} className={active === t.id ? 'on' : ''} onClick={() => onChange(t.id)}>{t.label}</button>)}</div>;
+}
+
 export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const p: Record<string, ReactNode> = {
     inspect: <path d="M5 3l12 7-5 1.5L9.5 17z" />,

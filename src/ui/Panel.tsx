@@ -1,4 +1,5 @@
 // Right-hand panel: results, plan, recommendations, the budget showdown, and assumptions.
+import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey, type Panel as PanelId } from '../store';
 import { fmtINR, type Grid } from '../sim/grid';
@@ -7,7 +8,7 @@ import type { Intervention, InterventionType, Metrics, SimResult } from '../sim/
 import { placeName } from '../sim/flood/optimizer';
 import { DEPTH } from '../sim/flood/engine';
 import { CompareBars, LineSeries, ShareBars, type BarRow } from './charts';
-import { Icon } from './Chrome';
+import { Icon, SubTabs } from './Chrome';
 import { cellX, cellZ, half } from '../three/geo';
 import { useHeat } from '../heatStore';
 import { HeatTab } from './heat/HeatPanel';
@@ -42,8 +43,39 @@ function Kpi({ label, base, after, fmt, hint }: { label: string; base: number; a
   );
 }
 
+/** Conditions at the playback time, read from the same run the map is drawing; the plan run is compared with no action at the same moment. */
+function LiveNow({ shown, base }: { shown: SimResult; base: SimResult | null }) {
+  const s = useStore(useShallow(st => ({ time: st.time, peak: st.peak, playing: st.playing, stormId: st.stormId })));
+  const L = shown.live;
+  if (!L) return null;
+  if (s.peak) return <div className="callout soft">Showing the <b>peak flood</b> (deepest water each place reached). Press play or drag the timeline to watch the storm unfold, minute by minute.</div>;
+  const step = shown.nFrames > 1 ? shown.frameTimes[1] - shown.frameTimes[0] : 1, k = Math.min(shown.nFrames - 1, Math.round(s.time / step));
+  const kb = base ? Math.min(base.nFrames - 1, k) : -1, B = base?.live;
+  const storm = STORMS.find(x => x.id === s.stormId)!, rainNow = shown.rainSeries[k];
+  const row = (label: string, v: number, b: number | undefined, fmt: (v: number) => string) => (
+    <div className="kv"><span>{label}</span><b>{fmt(v)}{b != null && Math.abs(b - v) > 1e-6 && <em className={v < b ? 'good' : 'bad'}> (no action: {fmt(b)})</em>}</b></div>
+  );
+  const hh = Math.floor(s.time / 60), mm = Math.floor(s.time % 60);
+  return (
+    <div className="live">
+      <h4>Right now <small>T+{hh}:{String(mm).padStart(2, '0')} · {rainNow > 0 ? `raining ${Math.round(rainNow)} mm/h` : s.time > 0 ? 'rain stopped, draining' : 'before the rain'}{s.playing ? ' · live' : ''}</small></h4>
+      {row('Rain fallen so far', L.rainMm[k], undefined, v => `${num(v, 1)} of ${storm.totalMm} mm`)}
+      {row('Homes with water inside', L.homesFlooded[k], B && B.homesFlooded[kb], v => num(v))}
+      {row('Residents affected', L.residents[k], B && B.residents[kb], v => num(v))}
+      {row('Roads cut (> 15 cm)', L.roadKmCut[k], B && B.roadKmCut[kb], v => `${num(v, 2)} km`)}
+      {row('Waterlogged area (> 10 cm)', L.wetArea[k] / 1e4, B && B.wetArea[kb] / 1e4, v => `${num(v, 2)} ha`)}
+      {row('Standing water', shown.pondedSeries[k], base ? base.pondedSeries[kb] : undefined, m3)}
+      {row('Drains overflowing', L.drainOverflowM[k], B && B.drainOverflowM[kb], v => `${num(v)} m`)}
+    </div>
+  );
+}
+
+const RESULT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'water', label: 'Water balance' }, { id: 'hotspots', label: 'Hotspots' }] as const;
+type ResultSub = (typeof RESULT_TABS)[number]['id'];
+
 function Results() {
   const s = useStore(useShallow(st => ({ grid: st.grid, baseline: st.baseline, current: st.current, currentKey: st.currentKey, plan: st.plan, view: st.view, stormId: st.stormId, runPlan: st.runPlan, running: st.running })));
+  const [sub, setSub] = useState<ResultSub>('overview');
   if (!s.grid || !s.baseline) return null;
   const b = s.baseline.metrics, planRes: SimResult | null = s.current && s.currentKey ? s.current : null, a = planRes?.metrics ?? null;
   const shown = (s.view === 'plan' && planRes) || s.baseline, bud = shown.budget, storm = STORMS.find(x => x.id === s.stormId)!;
@@ -53,39 +85,55 @@ function Results() {
       <p className="sub">{storm.name}: {storm.note}</p>
       <CalcSourceTag source={shown.source} />
       {stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)} disabled={s.running}>Run the same storm again</button> to update these numbers.</div>}
+      {s.running && <div className="callout soft">Recalculating for {storm.name.toLowerCase()}…</div>}
       {!a && !s.plan.length && <div className="callout soft">These are the results with <b>no action</b>. Place interventions, or press <b>Recommend</b>, then run the same storm to compare.</div>}
-      <div className="kpis">
-        <Kpi label="Homes with water inside" base={b.buildingsFlooded} after={a?.buildingsFlooded ?? null} fmt={v => num(v)} hint="Water at the doorstep rose above the plinth" />
-        <Kpi label="Residents affected (est.)" base={b.residentsAffected} after={a?.residentsAffected ?? null} fmt={v => num(v)} />
-        <Kpi label="Roads cut (> 15 cm)" base={b.roadKmAffected} after={a?.roadKmAffected ?? null} fmt={v => `${num(v, 2)} km`} hint="Depth at which two-wheelers stall" />
-        <Kpi label="Waterlogged area" base={b.floodedArea / 1e4} after={a ? a.floodedArea / 1e4 : null} fmt={v => `${num(v, 2)} ha`} hint="Street depth above 10 cm" />
-        <Kpi label="Road disruption" base={b.roadKmHours} after={a?.roadKmHours ?? null} fmt={v => `${num(v, 1)} km·h`} hint="Kilometres of road × hours above 15 cm" />
-        <Kpi label="Flood impact index" base={100} after={a ? (a.impact / Math.max(1e-9, b.impact)) * 100 : null} fmt={v => num(v)} hint="Harm-weighted standing water (roads by class, homes by residents, schools and hospitals ×), no action = 100" />
-      </div>
-      <h4>Standing water over time</h4>
-      <LineSeries unit="m³" fmt={v => (v >= 1000 ? `${num(v / 1000, 1)}k` : num(v))} series={[
-        { key: 'none', xs: s.baseline.frameTimes, ys: s.baseline.pondedSeries },
-        ...(planRes ? [{ key: 'plan' as const, xs: planRes.frameTimes, ys: planRes.pondedSeries }] : []),
-      ]} />
-      <h4>Where the rain went <small>({s.view === 'plan' && planRes ? 'your plan' : 'no action'}, {m3(bud.rain)} fell)</small></h4>
-      <ShareBars total={bud.rain} fmt={m3} rows={[
-        { label: 'Soaked into the ground', value: bud.infiltrated },
-        { label: 'Stored by rooftop harvesting', value: bud.harvested },
-        { label: 'Absorbed by rain gardens and pits', value: bud.gardens + bud.pits },
-        { label: 'Carried away by drains', value: bud.drains + bud.drainStore },
-        { label: 'Ran off the area over the surface', value: bud.edge + bud.channel },
-        { label: 'Still standing at the end', value: Math.max(0, bud.standingEnd) },
-      ]} />
-      <h4>Waterlogging hotspots <small>(click to fly there)</small></h4>
-      <ol className="hotspots">
-        {shown.hotspots.slice(0, 6).map((h, k) => (
-          <li key={k}><button onClick={() => useStore.setState({ flyTo: { x: h.x - half(s.grid!), z: h.z - half(s.grid!), t: Date.now() } })}>
-            <b>{h.road}</b><span>{Math.round(h.maxDepth * 100)} cm deep · {num(h.area)} m²{h.buildingsFlooded ? ` · ${h.buildingsFlooded} ${h.buildingsFlooded === 1 ? 'home takes' : 'homes take'} water` : ''}</span>
-          </button></li>
-        ))}
-        {!shown.hotspots.length && <li className="muted">No street is under more than 15 cm.</li>}
-      </ol>
-      <p className="fine">Model check: water balance closes to {num(Math.abs(bud.error), 2)} m³ of {m3(bud.rain)}; this run took {Math.round(shown.runtimeMs)} ms.</p>
+      <LiveNow shown={shown} base={shown !== s.baseline ? s.baseline : null} />
+      <SubTabs tabs={RESULT_TABS} active={sub} onChange={setSub} />
+      {sub === 'overview' && (
+        <>
+          <h4>Whole storm <small>(worst moment at each place, {storm.totalMm} mm in {storm.durationMin / 60} h)</small></h4>
+          <div className="kpis">
+            <Kpi label="Homes with water inside" base={b.buildingsFlooded} after={a?.buildingsFlooded ?? null} fmt={v => num(v)} hint="Water at the doorstep rose above the plinth" />
+            <Kpi label="Residents affected (est.)" base={b.residentsAffected} after={a?.residentsAffected ?? null} fmt={v => num(v)} />
+            <Kpi label="Roads cut (> 15 cm)" base={b.roadKmAffected} after={a?.roadKmAffected ?? null} fmt={v => `${num(v, 2)} km`} hint="Depth at which two-wheelers stall" />
+            <Kpi label="Waterlogged area" base={b.floodedArea / 1e4} after={a ? a.floodedArea / 1e4 : null} fmt={v => `${num(v, 2)} ha`} hint="Street depth above 10 cm" />
+            <Kpi label="Road disruption" base={b.roadKmHours} after={a?.roadKmHours ?? null} fmt={v => `${num(v, 1)} km·h`} hint="Kilometres of road × hours above 15 cm" />
+            <Kpi label="Flood impact index" base={100} after={a ? (a.impact / Math.max(1e-9, b.impact)) * 100 : null} fmt={v => num(v)} hint="Harm-weighted standing water (roads by class, homes by residents, schools and hospitals ×), no action = 100" />
+          </div>
+        </>
+      )}
+      {sub === 'water' && (
+        <>
+          <h4>Standing water over time</h4>
+          <LineSeries unit="m³" fmt={v => (v >= 1000 ? `${num(v / 1000, 1)}k` : num(v))} series={[
+            { key: 'none', xs: s.baseline.frameTimes, ys: s.baseline.pondedSeries },
+            ...(planRes ? [{ key: 'plan' as const, xs: planRes.frameTimes, ys: planRes.pondedSeries }] : []),
+          ]} />
+          <h4>Where the rain went <small>({s.view === 'plan' && planRes ? 'your plan' : 'no action'}, {m3(bud.rain)} fell)</small></h4>
+          <ShareBars total={bud.rain} fmt={m3} rows={[
+            { label: 'Soaked into the ground', value: bud.infiltrated },
+            { label: 'Stored by rooftop harvesting', value: bud.harvested },
+            { label: 'Absorbed by rain gardens and pits', value: bud.gardens + bud.pits },
+            { label: 'Carried away by drains', value: bud.drains + bud.drainStore },
+            { label: 'Ran off the area over the surface', value: bud.edge + bud.channel },
+            { label: 'Still standing at the end', value: Math.max(0, bud.standingEnd) },
+          ]} />
+          <p className="fine">Model check: water balance closes to {num(Math.abs(bud.error), 2)} m³ of {m3(bud.rain)}; this run took {Math.round(shown.runtimeMs)} ms.</p>
+        </>
+      )}
+      {sub === 'hotspots' && (
+        <>
+          <h4>Waterlogging hotspots <small>(click to fly there)</small></h4>
+          <ol className="hotspots">
+            {shown.hotspots.slice(0, 6).map((h, k) => (
+              <li key={k}><button onClick={() => useStore.setState({ flyTo: { x: h.x - half(s.grid!), z: h.z - half(s.grid!), t: Date.now() } })}>
+                <b>{h.road}</b><span>{Math.round(h.maxDepth * 100)} cm deep · {num(h.area)} m²{h.buildingsFlooded ? ` · ${h.buildingsFlooded} ${h.buildingsFlooded === 1 ? 'home takes' : 'homes take'} water` : ''}</span>
+              </button></li>
+            ))}
+            {!shown.hotspots.length && <li className="muted">No street is under more than 15 cm.</li>}
+          </ol>
+        </>
+      )}
     </div>
   );
 }

@@ -47,7 +47,8 @@ interface State {
 
 export const planKey = (plan: Intervention[]) => plan.map(p => p.id).join('|');
 export const simOptions = (s: Pick<State, 'stormId' | 'antecedent'>, keepFrames = true): SimOptions => floodRunOptions(s.stormId, s.antecedent, keepFrames);
-let ivSeq = 0;
+const condKey = (s: Pick<State, 'siteId' | 'stormId' | 'antecedent'>) => `${s.siteId}|${s.stormId}|${s.antecedent}`;
+let ivSeq = 0, baselineSeq = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const modeFromUrl = (): Mode => (location.hash.split('/')[1] === 'heat' || new URLSearchParams(location.search).get('mode') === 'heat' ? 'heat' : 'flood');
@@ -125,17 +126,20 @@ export const useStore = create<State>((set, get) => ({
   setBudget: budget => set({ budget, recommendation: null, showdown: null }),
 
   runBaseline: async () => {
+    const cond = condKey(get()), seq = ++baselineSeq;
     set({ running: true });
     const baseline = await engine.simulate([], simOptions(get()));
+    // a newer storm / soil choice was made while this ran: its own run will land, so drop this one
+    if (seq !== baselineSeq || condKey(get()) !== cond) return;
     const s = get();
     set({ baseline, running: false, ...(s.plan.length ? {} : { current: baseline, currentKey: '', view: 'baseline' as const }) });
   },
 
   runPlan: async (autoplay = true) => {
-    const { plan } = get(), key = planKey(plan);
+    const { plan } = get(), key = planKey(plan), cond = condKey(get());
     set({ running: true });
     const current = await engine.simulate(plan, simOptions(get()));
-    if (planKey(get().plan) !== key) { set({ running: false }); return; }   // plan changed meanwhile
+    if (planKey(get().plan) !== key || condKey(get()) !== cond) { set({ running: false }); return; }   // plan or storm changed meanwhile
     set({ current, currentKey: key, running: false, view: 'plan', ...(autoplay ? { time: 0, playing: true, peak: false } : {}) });
   },
 

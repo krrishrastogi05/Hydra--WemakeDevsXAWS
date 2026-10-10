@@ -1,6 +1,6 @@
 // Heat mode's side-panel tabs: results, plan, recommendations, the budget showdown, and assumptions.
 // Same tabs and building blocks as flood mode; every number comes from a heat-engine result.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store';
 import { heatPlanKey, useHeat } from '../../heatStore';
@@ -10,7 +10,7 @@ import { heatPlaceName } from '../../sim/heat/optimizer';
 import { heatIndexBand } from '../../sim/heat/solar';
 import type { HeatIntervention, HeatInterventionType, HeatMetrics, HeatResult, HeatSite } from '../../sim/heat/types';
 import { CompareBars, LineSeries, type BarRow } from '../charts';
-import { Icon } from '../Chrome';
+import { Icon, SubTabs } from '../Chrome';
 import { ShareReport } from '../Share';
 import { CalcSourceTag, ProgressBar } from '../calc';
 import { cellX, cellZ, half } from '../../three/geo';
@@ -52,9 +52,13 @@ export function describeHeat(g: Grid, hs: HeatSite, iv: HeatIntervention) {
   return `at ${heatPlaceName(g, hs, iv.cells![0])}`;
 }
 
+const HEAT_RESULT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'exposure', label: 'Exposure over time' }, { id: 'hotspots', label: 'Hottest places' }] as const;
+type HeatResultSub = (typeof HEAT_RESULT_TABS)[number]['id'];
+
 function Results() {
   const grid = useStore(s => s.grid);
   const s = useHeat(useShallow(st => ({ heat: st.heat, baseline: st.baseline, current: st.current, currentKey: st.currentKey, plan: st.plan, view: st.view, scenarioId: st.scenarioId, windowId: st.windowId, runPlan: st.runPlan, running: st.running })));
+  const [sub, setSub] = useState<HeatResultSub>('overview');
   const planRes = s.current && s.currentKey ? s.current : null;
   const baseSun = useMemo(() => (s.baseline ? sunShare(s.baseline) : null), [s.baseline]);
   const planSun = useMemo(() => (planRes ? sunShare(planRes) : null), [planRes]);
@@ -70,27 +74,38 @@ function Results() {
       <div className="callout soft">Air in the shade: heat index <b>{num(s.baseline.heatIndexC, 1)} °C</b> (NOAA band: {heatIndexBand(s.baseline.heatIndexC)}). Sun and hot surfaces add to that on exposed streets, which is what the index below compares.</div>
       {stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)} disabled={s.running}>Run the same day again</button> to update these numbers.</div>}
       {!a && !s.plan.length && <div className="callout soft">These are the results with <b>no action</b>. Plant trees or add canopies (keys 1–4), or press <b>Recommend</b>, then run the same day to compare.</div>}
-      <div className="kpis">
-        <HKpi label="Exposure at busy places" base={b.weightedIndex} after={a?.weightedIndex ?? null} fmt={v => num(v, 1)} hint="Relative exposure index (0–100), weighted by how many people use each spot" />
-        <HKpi label={`High-exposure places (of ${s.heat.receptors.length})`} base={b.hotReceptors} after={a?.hotReceptors ?? null} fmt={v => num(v)} hint={`Bus stops, markets, gates and parks with an index of ${P.high} or more`} />
-        <HKpi label="Shade where people wait" base={b.receptorShade} after={a?.receptorShade ?? null} fmt={pctTxt} higherBetter hint="Share of the window's direct sun that is blocked at bus stops, markets, gates and parks" />
-        <HKpi label="Street space in sun at midday" base={b.exposedShare} after={a?.exposedShare ?? null} fmt={pctTxt} hint="Share of pedestrian space in direct sun when the sun is highest in the window" />
-        <HKpi label="Direct sun per spot" base={b.sunHours} after={a?.sunHours ?? null} fmt={v => `${num(v, 1)} h`} hint="Average hours of direct sun on pedestrian space in the window" />
-        <HKpi label="Heat absorbed by roofs" base={b.roofHeat} after={a?.roofHeat ?? null} fmt={v => `${num(v, 0)} MWh`} hint="Solar heat soaked up by all roofs in the window; cool roofs cut this" />
-      </div>
-      <h4>Pedestrian space in direct sun <small>(through the day)</small></h4>
-      {baseSun && <LineSeries unit="%" fmt={v => `${Math.round(v)}%`} xLabel="time of day" xFmt={v => clock(v + DAY_START)} series={[
-        { key: 'none', xs, ys: baseSun }, ...(planSun ? [{ key: 'plan' as const, xs, ys: planSun }] : []),
-      ]} />}
-      <h4>Hottest places <small>({s.view === 'plan' && planRes ? 'your plan' : 'no action'}; click to fly there)</small></h4>
-      <ol className="hotspots heat">
-        {shown.hotspots.slice(0, 8).map((h, k) => (
-          <li key={k}><button onClick={() => useStore.setState({ flyTo: { x: h.x - half(grid), z: h.z - half(grid), t: Date.now() } })}>
-            <b>{h.name}</b><span>index {Math.round(h.index)} · {KIND[h.kind]} · {num(h.sunHours, 1)} h of direct sun · {pctTxt(h.shade)} shaded</span>
-          </button></li>
-        ))}
-      </ol>
-      <p className="fine">Relative index for comparing places and plans under the same weather; not a heat-stress (UTCI/WBGT) or health measure. This run took {Math.round(shown.runtimeMs)} ms.</p>
+      <SubTabs tabs={HEAT_RESULT_TABS} active={sub} onChange={setSub} />
+      {sub === 'overview' && (
+        <div className="kpis">
+          <HKpi label="Exposure at busy places" base={b.weightedIndex} after={a?.weightedIndex ?? null} fmt={v => num(v, 1)} hint="Relative exposure index (0–100), weighted by how many people use each spot" />
+          <HKpi label={`High-exposure places (of ${s.heat.receptors.length})`} base={b.hotReceptors} after={a?.hotReceptors ?? null} fmt={v => num(v)} hint={`Bus stops, markets, gates and parks with an index of ${P.high} or more`} />
+          <HKpi label="Shade where people wait" base={b.receptorShade} after={a?.receptorShade ?? null} fmt={pctTxt} higherBetter hint="Share of the window's direct sun that is blocked at bus stops, markets, gates and parks" />
+          <HKpi label="Street space in sun at midday" base={b.exposedShare} after={a?.exposedShare ?? null} fmt={pctTxt} hint="Share of pedestrian space in direct sun when the sun is highest in the window" />
+          <HKpi label="Direct sun per spot" base={b.sunHours} after={a?.sunHours ?? null} fmt={v => `${num(v, 1)} h`} hint="Average hours of direct sun on pedestrian space in the window" />
+          <HKpi label="Heat absorbed by roofs" base={b.roofHeat} after={a?.roofHeat ?? null} fmt={v => `${num(v, 0)} MWh`} hint="Solar heat soaked up by all roofs in the window; cool roofs cut this" />
+        </div>
+      )}
+      {sub === 'exposure' && (
+        <>
+          <h4>Pedestrian space in direct sun <small>(through the day)</small></h4>
+          {baseSun && <LineSeries unit="%" fmt={v => `${Math.round(v)}%`} xLabel="time of day" xFmt={v => clock(v + DAY_START)} series={[
+            { key: 'none', xs, ys: baseSun }, ...(planSun ? [{ key: 'plan' as const, xs, ys: planSun }] : []),
+          ]} />}
+          <p className="fine">Relative index for comparing places and plans under the same weather; not a heat-stress (UTCI/WBGT) or health measure. This run took {Math.round(shown.runtimeMs)} ms.</p>
+        </>
+      )}
+      {sub === 'hotspots' && (
+        <>
+          <h4>Hottest places <small>({s.view === 'plan' && planRes ? 'your plan' : 'no action'}; click to fly there)</small></h4>
+          <ol className="hotspots heat">
+            {shown.hotspots.slice(0, 8).map((h, k) => (
+              <li key={k}><button onClick={() => useStore.setState({ flyTo: { x: h.x - half(grid), z: h.z - half(grid), t: Date.now() } })}>
+                <b>{h.name}</b><span>index {Math.round(h.index)} · {KIND[h.kind]} · {num(h.sunHours, 1)} h of direct sun · {pctTxt(h.shade)} shaded</span>
+              </button></li>
+            ))}
+          </ol>
+        </>
+      )}
     </div>
   );
 }

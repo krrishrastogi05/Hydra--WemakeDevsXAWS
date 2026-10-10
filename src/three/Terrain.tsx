@@ -136,6 +136,7 @@ export function Terrain() {
   const skirt = useMemo(() => skirtGeometry(grid), [grid]);
   const risk = useMemo(() => (result && overlay === 'risk' ? riskMap(grid, result.maxDepth) : null), [grid, result, overlay]);
   const { terrain } = useTools();
+  const size = half(grid) * 2;
   return (
     <group>
       <mesh geometry={geo} receiveShadow {...terrain}>
@@ -148,6 +149,11 @@ export function Terrain() {
       )}
       <mesh geometry={skirt}>
         <meshStandardMaterial vertexColors roughness={1} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Closes the diorama from below, so no grazing camera angle can see a hollow gap under the block. */}
+      <mesh position={[0, -14, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[size, size]} />
+        <meshStandardMaterial color="#2f2b28" roughness={1} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );

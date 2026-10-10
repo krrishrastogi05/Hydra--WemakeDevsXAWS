@@ -16,7 +16,21 @@ const ROOFS = ['#b9b3a7', '#aea89c', '#c2bcb0', '#a39d92'];
 export const FLOODED = '#d64545', AT_RISK = '#e0a030';
 const FLOOR_H = 3.2, PARAPET_H = 0.9, PARAPET_W = 0.28;
 
-export interface BuildingMesh { geometry: THREE.BufferGeometry; edges: THREE.BufferGeometry; starts: Int32Array; tops: { x: number; y: number; z: number; r: number }[]; baseColor: Float32Array }
+export interface BuildingMesh { geometry: THREE.BufferGeometry; edges: THREE.BufferGeometry; starts: Int32Array; tops: { x: number; y: number; z: number; r: number; base: number }[]; baseColor: Float32Array }
+
+/** A soft dark radial gradient, reused by every building as a cheap "grounded" contact shadow that needs no
+ *  real-time shadow map or post-processing, so it looks right even on the Low graphics tier. */
+let blobTex: THREE.CanvasTexture | null = null;
+function blobTexture() {
+  if (blobTex) return blobTex;
+  const s = 64, cnv = document.createElement('canvas');
+  cnv.width = cnv.height = s;
+  const ctx = cnv.getContext('2d')!, g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0.38)'); g.addColorStop(0.7, 'rgba(0,0,0,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  blobTex = new THREE.CanvasTexture(cnv);
+  return blobTex;
+}
 
 /** Per-vertex attributes the facade shader needs: where the ground floor starts and where the roof is (world y). */
 function tagFloors(geo: THREE.BufferGeometry, floorBase: number, roof: number) {
@@ -48,7 +62,7 @@ export function buildBuildings(g: Grid): BuildingMesh {
     const pts = b.poly.map(([x, z]) => new THREE.Vector2(x - h, -(z - h)));
     if (pts.length > 2 && pts[0].equals(pts[pts.length - 1])) pts.pop();
     starts.push(vcount);
-    if (pts.length < 3) { tops.push({ x: 0, y: -999, z: 0, r: 0 }); return; }
+    if (pts.length < 3) { tops.push({ x: 0, y: -999, z: 0, r: 0, base: 0 }); return; }
     const jitter = (hash(k * 11 + 3) - 0.5) * 0.06;
     const wall = new THREE.Color(b.critical ? '#f2f1ec' : b.use === 'Commercial' ? '#c3cad1' : b.use === 'Religious' ? '#e3d2a4' : PLASTER[Math.floor(hash(k + 7) * PLASTER.length)]).offsetHSL(0, 0, jitter);
     const roof = new THREE.Color(ROOFS[Math.floor(hash(k * 5 + 2) * ROOFS.length)]).offsetHSL(0, 0, jitter * 0.6);
@@ -76,7 +90,7 @@ export function buildBuildings(g: Grid): BuildingMesh {
       vcount += box.getAttribute('position').count;
     }
     const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length, cz = -pts.reduce((a, p) => a + p.y, 0) / pts.length;
-    tops.push({ x: cx, y: roofY, z: cz, r: Math.sqrt(Math.max(b.area, 20)) });
+    tops.push({ x: cx, y: roofY, z: cz, r: Math.sqrt(Math.max(b.area, 20)), base: y0 });
   });
   const geometry = mergeGeometries(geos, false)!;
   // model-style outlines: corners and roof / ground edges of the blocks
@@ -105,7 +119,7 @@ function facadeMaterial() {
             vec2 tng = normalize(vec2(-vWNrm.z, vWNrm.x));
             float fx = fract(dot(vWPos.xz, tng) / 2.6);
             float pane = step(0.32, fy) * step(fy, 0.78) * step(0.22, fx) * step(fx, 0.72);
-            float near = 1.0 - smoothstep(220.0, 640.0, distance(vWPos, cameraPosition));   // panes fade with distance, so far blocks read as plaster, not dice
+            float near = 1.0 - smoothstep(350.0, 950.0, distance(vWPos, cameraPosition));   // panes fade with distance, so far blocks read as plaster, not dice
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.24, 0.28), pane * 0.55 * near);
             diffuseColor.rgb *= 1.0 - 0.1 * step(fy, 0.05) * near;
           }
@@ -133,18 +147,21 @@ export function Buildings() {
   const showRisk = useStore(s => s.peak || s.time > 0);
   const mesh = useMemo(() => buildBuildings(grid), [grid]);
   const material = useMemo(facadeMaterial, []);
-  const outlines = useStore(s => s.quality === 'high');
   const { buildings } = useTools();
-  const tankRef = useRef<THREE.InstancedMesh>(null), rwhRef = useRef<THREE.InstancedMesh>(null);
+  const tankRef = useRef<THREE.InstancedMesh>(null), rwhRef = useRef<THREE.InstancedMesh>(null), shadowRef = useRef<THREE.InstancedMesh>(null);
 
   // wall colours: pastel, flood risk (flood mode), cool roofs (heat mode), or data provenance
   useEffect(() => {
     const attr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute, arr = attr.array as Float32Array;
     arr.set(mesh.baseColor);
     const nrm = mesh.geometry.getAttribute('normal');
-    const paint = (k: number, hex: string) => {
-      const c = new THREE.Color(hex);
-      for (let v = mesh.starts[k]; v < mesh.starts[k + 1]; v++) if (nrm.getY(v) <= 0.5) c.toArray(arr, v * 3);
+    // tints into the existing plaster colour rather than overwriting it, so risk colour still reads as a wall, not a flat paint fill
+    const paint = (k: number, hex: string, mix = 1) => {
+      const c = new THREE.Color(hex), base = new THREE.Color();
+      for (let v = mesh.starts[k]; v < mesh.starts[k + 1]; v++) if (nrm.getY(v) <= 0.5) {
+        const i = v * 3;
+        base.fromArray(arr, i).lerp(c, mix).toArray(arr, i);
+      }
     };
     if (overlay === 'sources') grid.site.buildings.forEach((b, k) => paint(k, b.synthetic ? '#c084fc' : '#f8fafc'));
     else if (mode === 'heat') {
@@ -152,7 +169,7 @@ export function Buildings() {
       for (const p of coolRoofs) if (p.type === 'coolroof') for (let v = mesh.starts[p.building!]; v < mesh.starts[p.building! + 1]; v++) if (nrm.getY(v) > 0.5) white.toArray(arr, v * 3);
     } else if (result && showRisk) grid.site.buildings.forEach((b, k) => {
       const d = result.doorstep[k];
-      if (d > b.plinth) paint(k, FLOODED); else if (d > DEPTH.wet) paint(k, AT_RISK);
+      if (d > b.plinth) paint(k, FLOODED, 0.65); else if (d > DEPTH.wet) paint(k, AT_RISK, 0.65);
     });
     attr.needsUpdate = true;
   }, [mesh, overlay, result, showRisk, grid, mode, coolRoofs]);
@@ -160,6 +177,7 @@ export function Buildings() {
   // rooftop water tanks (decorative: most Indian flat roofs carry one) and blue RWH tanks from the plan
   const rwh = useMemo(() => new Set(mode === 'flood' ? plan.filter(p => p.type === 'rwh').map(p => p.building!) : []), [plan, mode]);
   const tankIds = useMemo(() => mesh.tops.map((t, k) => (t.y > -999 && grid.site.buildings[k].use === 'Residential' && hash(k * 3 + 1) < 0.55 ? k : -1)).filter(k => k >= 0), [mesh, grid]);
+  const groundIds = useMemo(() => mesh.tops.map((t, k) => (t.y > -999 ? k : -1)).filter(k => k >= 0), [mesh]);
   useEffect(() => {
     const m = new THREE.Matrix4(), place = (inst: THREE.InstancedMesh | null, ids: number[], s: number) => {
       if (!inst) return;
@@ -169,15 +187,27 @@ export function Buildings() {
     place(tankRef.current, tankIds.filter(k => !rwh.has(k)), 1);
     place(rwhRef.current, [...rwh].filter(k => mesh.tops[k]?.y > -999), 1.9);
   }, [mesh, tankIds, rwh]);
+  useEffect(() => {
+    const inst = shadowRef.current;
+    if (!inst) return;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    groundIds.forEach((k, j) => { const t = mesh.tops[k], s = t.r * 1.9; m.compose(new THREE.Vector3(t.x, t.base + 0.03, t.z), q, new THREE.Vector3(s, s, 1)); inst.setMatrixAt(j, m); });
+    inst.count = groundIds.length; inst.instanceMatrix.needsUpdate = true; inst.computeBoundingSphere();
+  }, [mesh, groundIds]);
 
   return (
     <group>
+      {/* cheap always-on "grounding" for buildings: a soft dark blob under each footprint, independent of real shadow maps or post-processing */}
+      <instancedMesh ref={shadowRef} args={[undefined, undefined, Math.max(1, groundIds.length)]} renderOrder={1} raycast={() => null}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial map={blobTexture()} transparent depthWrite={false} toneMapped={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+      </instancedMesh>
       <mesh geometry={mesh.geometry} material={material} castShadow receiveShadow
         onPointerMove={e => e.faceIndex != null && buildings.onPointerMove(e, buildingOfFace(mesh, e.faceIndex))}
         onClick={e => e.faceIndex != null && buildings.onClick(e, buildingOfFace(mesh, e.faceIndex))}
         onPointerOut={buildings.onPointerOut}>
       </mesh>
-      {outlines && <lineSegments geometry={mesh.edges} raycast={() => null}><lineBasicMaterial color="#1b1f24" transparent opacity={0.22} /></lineSegments>}
+      <lineSegments geometry={mesh.edges} raycast={() => null}><lineBasicMaterial color="#1b1f24" transparent opacity={0.22} /></lineSegments>
       <instancedMesh ref={tankRef} args={[undefined, undefined, Math.max(1, tankIds.length)]} castShadow>
         <cylinderGeometry args={[0.55, 0.55, 1.2, 10]} />
         <meshStandardMaterial color="#1d1f22" roughness={0.6} />

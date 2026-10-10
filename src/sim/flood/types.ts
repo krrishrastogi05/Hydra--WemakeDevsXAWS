@@ -36,12 +36,22 @@ export interface Hotspot {
   cell: number; x: number; z: number; maxDepth: number; area: number; volume: number;
   road: string; buildingsFlooded: number; impact: number;
 }
+/** Per frame, by the same thresholds as Metrics, but for the water present at that moment rather than the event peak. */
+export interface LiveSeries {
+  rainMm: Float32Array;          // rain fallen so far, mm
+  wetArea: Float32Array;         // m2 of street deeper than 10 cm
+  roadKmCut: Float32Array;       // km of road deeper than 15 cm
+  homesFlooded: Float32Array;    // buildings with water above the plinth
+  residents: Float32Array;       // residents of those buildings
+  drainOverflowM: Float32Array;  // metres of drain overflowing onto the street
+}
 export interface SimResult {
   n: number; nFrames: number;
   frames: Uint16Array | null;        // nFrames * n, depth in mm
   frameTimes: Float32Array;          // minutes
   rainSeries: Float32Array;          // mm/h at each frame
   pondedSeries: Float32Array;        // m3 of standing water on land at each frame
+  live?: LiveSeries;                 // conditions at each frame (playback runs only; absent from an older API)
   drainCells: Int32Array;            // cells that carry a drain
   drainFrames: Uint8Array | null;    // nFrames * drainCells.length, utilisation 0..255 (255 = surcharging)
   maxDepth: Float32Array;            // m

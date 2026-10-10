@@ -1,8 +1,9 @@
 // The 3D stage: sky, light, orbit camera, and every layer of the neighbourhood.
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer, OrbitControls, PerformanceMonitor } from '@react-three/drei';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '../store';
 import { Terrain } from './Terrain';
 import { Buildings } from './Buildings';
@@ -12,6 +13,71 @@ import { Markers } from './flood/Markers';
 import { HeatInterventions, HeatLights, HeatMarkers, HeatOverlay, SiteTrees, Trees } from './heat/HeatLayer';
 import { useHeat } from '../heatStore';
 import { Effects } from './Effects';
+
+/** Click-drag orbits by default (easiest gesture on a laptop trackpad, no second button needed); holding Shift
+ *  switches the same drag to pan, so panning never requires a right-click-drag. */
+function useShiftToPan(ref: React.RefObject<OrbitControlsImpl | null>) {
+  useEffect(() => {
+    const set = (pan: boolean) => { const c = ref.current; if (c) c.mouseButtons.LEFT = pan ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE; };
+    const down = (e: KeyboardEvent) => e.key === 'Shift' && set(true);
+    const up = (e: KeyboardEvent) => e.key === 'Shift' && set(false);
+    const blur = () => set(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
+  }, [ref]);
+}
+
+/** Holding Space turns the pointer into a hand and pans the ground plane as the mouse simply moves — no click
+ *  or drag needed, like a free-look pan tool. Movement is constrained to the horizontal plane (forward/back
+ *  along the view direction, strafe left/right), not raw screen-space panning, so the ground stays level. */
+function useSpaceHoverPan(ref: React.RefObject<OrbitControlsImpl | null>) {
+  useEffect(() => {
+    let space = false, last: { x: number; y: number } | null = null;
+    const typing = () => { const t = document.activeElement; return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+    const setCursor = () => { document.body.style.cursor = space ? 'grab' : ''; };
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || space || typing()) return;
+      e.preventDefault(); space = true; last = null; setCursor();
+      const c = ref.current; if (c) c.enableRotate = false;
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      space = false; last = null; setCursor();
+      const c = ref.current; if (c) c.enableRotate = true;
+    };
+    const move = (e: PointerEvent) => {
+      const c = ref.current;
+      if (!space || !c) return;
+      if (!last) { last = { x: e.clientX, y: e.clientY }; return; }
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+      if (!dx && !dy) return;
+      const cam = c.object as THREE.PerspectiveCamera;
+      const dist = cam.position.distanceTo(c.target);
+      const scale = (2 * Math.tan((cam.fov * Math.PI) / 360) * dist) / window.innerHeight;
+      const dir = new THREE.Vector3(); cam.getWorldDirection(dir); dir.y = 0; dir.normalize();
+      const right = dir.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+      const delta = new THREE.Vector3().addScaledVector(right, -dx * scale).addScaledVector(dir, dy * scale);
+      c.target.add(delta);
+      cam.position.add(delta);
+      c.update();
+    };
+    const blur = () => { space = false; last = null; setCursor(); const c = ref.current; if (c) c.enableRotate = true; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('blur', blur);
+      document.body.style.cursor = '';
+    };
+  }, [ref]);
+}
 
 function CameraRig() {
   const controls = useThree(s => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
@@ -64,7 +130,7 @@ function FloodLights({ shadowSize }: { shadowSize: number }) {
   });
   return (
     <>
-      <Sky horizon="#3a4c5f" zenith="#0e1824" ground="#1a1714" skyRef={sky} />
+      <Sky horizon="#3a4c5f" zenith="#0e1824" ground="#2f2b28" skyRef={sky} />
       <fog attach="fog" args={['#2a3846', CALM.fogNear, CALM.fogFar]} />
       <hemisphereLight ref={hemi} args={['#d6e2ef', '#4a3f35', CALM.hemi]} />
       <directionalLight ref={sun} position={[-260, 420, 220]} intensity={CALM.sun} color="#fff6ea" castShadow
@@ -92,6 +158,9 @@ export function Scene() {
   const heatReady = useHeat(s => !!s.heat && !!s.baseline && s.siteId === grid?.site.id);
   const high = quality === 'high';
   const declined = useRef(false);
+  const orbitRef = useRef<OrbitControlsImpl>(null);
+  useShiftToPan(orbitRef);
+  useSpaceHoverPan(orbitRef);
   const onDecline = () => {
     const st = useStore.getState();
     if (declined.current || st.quality === 'low' || st.qualityChosen) return;
@@ -100,12 +169,12 @@ export function Scene() {
     useStore.getState().notify('Graphics switched to Low to keep the map smooth. Change it in the map legend.');
   };
   return (
-    <Canvas shadows={{ type: THREE.PCFShadowMap }} dpr={high ? [1, 1.75] : 1} gl={{ antialias: !high, alpha: false, toneMappingExposure: 1.2 }}
+    <Canvas shadows={{ type: high ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap }} dpr={high ? [1, 1.5] : 1} gl={{ antialias: !high, alpha: false, toneMappingExposure: 1.2 }}
       camera={{ position: [240, 330, 470], fov: 42, near: 1, far: 7000 }}>
       <PerformanceMonitor bounds={() => [26, 55]} flipflops={2} onDecline={onDecline} />
-      {mode === 'flood' ? <FloodLights shadowSize={high ? 2048 : 1024} /> : (
+      {mode === 'flood' ? <FloodLights shadowSize={high ? 1536 : 1024} /> : (
         <>
-          <Sky horizon="#5a4636" zenith="#1a1410" ground="#1a1410" />
+          <Sky horizon="#5a4636" zenith="#1a1410" ground="#2f2b28" />
           <HeatLights />
         </>
       )}
@@ -134,9 +203,16 @@ export function Scene() {
           )}
         </group>
       )}
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI * 0.46} minDistance={40} maxDistance={1400} target={[0, 0, 30]} />
+      <OrbitControls
+        ref={orbitRef}
+        makeDefault enableDamping dampingFactor={0.08}
+        maxPolarAngle={Math.PI * 0.46} minDistance={40} maxDistance={1400} target={[0, 0, 30]}
+        zoomSpeed={0.9} rotateSpeed={0.6} panSpeed={0.9} screenSpacePanning zoomToCursor
+        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+      />
       <CameraRig />
-      {high && <Effects />}
+      <Effects tier={high ? 'high' : 'low'} />
     </Canvas>
   );
 }
