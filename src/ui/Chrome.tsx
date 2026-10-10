@@ -155,7 +155,7 @@ function FloodLegend() {
       <div className="lg-title">Buildings</div>
       <div className="swatches"><span><i style={{ background: '#d64545' }} />water above plinth</span><span><i style={{ background: '#e0a030' }} />water at the door</span></div>
       <div className="lg-title">Drains</div>
-      <div className="swatches"><span><i style={{ background: '#5f4c34' }} />silted, idle</span><span><i style={{ background: '#38bdf8' }} />flowing</span><span><i style={{ background: '#fb923c' }} />full</span><span><i style={{ background: '#ef4444' }} />overflowing</span></div>
+      <div className="swatches"><span><i style={{ background: '#2b2620', boxShadow: 'inset 0 0 0 1px #86837c' }} />silted, idle</span><span><i style={{ background: '#38bdf8' }} />flowing</span><span><i style={{ background: '#fb923c' }} />full</span><span><i style={{ background: '#ef4444' }} />overflowing</span></div>
       <div className="toggles">
         <label><input type="checkbox" checked={s.overlay === 'risk'} onChange={e => s.set({ overlay: e.target.checked ? 'risk' : 'none' })} />Risk heat-map</label>
         <label><input type="checkbox" checked={s.overlay === 'sources'} onChange={e => s.set({ overlay: e.target.checked ? 'sources' : 'none' })} />Data sources <em>violet = synthetic</em></label>

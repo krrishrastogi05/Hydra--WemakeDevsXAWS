@@ -199,7 +199,7 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 .maplegend { position: absolute; top: calc(var(--top) + 12px); right: calc(var(--panel-w) + 24px); width: 214px; padding: 9px 11px; border-radius: var(--r); z-index: 20; font-size: 11.5px; color: var(--ink-2); display: grid; gap: 4px; }
 .lg-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-top: 2px; }
 .ramp { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 10.5px; color: var(--ink-3); }
-.ramp i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #9edbf2, #3c8fc4, #0d4285); margin-bottom: 2px; }
+.ramp i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #8fb7c4, #3d7ea0, #0a3a68); margin-bottom: 2px; }
 .ramp span:nth-child(3) { text-align: center; } .ramp span:last-child { text-align: right; }
 .swatches { display: flex; flex-wrap: wrap; gap: 3px 10px; }
 .swatches i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
