@@ -1,16 +1,20 @@
 // Placed interventions, placement previews (green = valid, red = not allowed) and the drain being drawn.
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { useStore, footprintFor } from '../store';
-import { validate, type Grid } from '../sim/model';
-import type { Intervention } from '../sim/types';
-import { cellX, cellY, cellZ } from './geo';
+import { useStore, footprintFor } from '../../store';
+import type { Grid } from '../../sim/grid';
+import { validate } from '../../sim/flood/model';
+import type { Intervention } from '../../sim/flood/types';
+import { cellX, cellY, cellZ } from '../geo';
 
 const box = new THREE.BoxGeometry(1, 1, 1);
-const SHRUB = new THREE.SphereGeometry(1, 8, 6);
+const SHRUB = new THREE.IcosahedronGeometry(1, 0);
 const RING = new THREE.TorusGeometry(1.25, 0.32, 8, 20).rotateX(Math.PI / 2);
-const DISK = new THREE.CircleGeometry(1.0, 18).rotateX(-Math.PI / 2);
-const PIN = new THREE.ConeGeometry(0.55, 1.6, 10).rotateX(Math.PI);
+const COVER_LID = new THREE.CylinderGeometry(1.25, 1.25, 0.18, 20);
+const GRATE = new THREE.CircleGeometry(0.8, 16).rotateX(-Math.PI / 2);
+const HALO = new THREE.RingGeometry(2.1, 2.5, 32).rotateX(-Math.PI / 2);
+const PLANTS: [number, number, number][] = [[-2.6, -2.2, 1.1], [2.4, -2.6, 0.9], [-2.2, 2.5, 1.0], [2.7, 2.1, 1.2], [0.2, 0.1, 0.8], [-0.4, -3.2, 0.7], [3.3, 0.4, 0.8], [-3.1, 0.2, 0.9], [1.1, 3.1, 0.75], [-1.2, 1.2, 0.6], [1.4, -1.0, 0.65]];
+const PLANT_GREENS = ['#56703f', '#647f48', '#4b6338', '#6f8a52'];
 
 function Segments({ grid, cells, color, y = 0.25, w = 1.4, h = 0.5, opacity = 1 }: { grid: Grid; cells: number[]; color: string; y?: number; w?: number; h?: number; opacity?: number }) {
   // one box per consecutive pair of cells (or a single cell), lying along the path
@@ -39,11 +43,13 @@ function Garden({ grid, cells, ghost }: { grid: Grid; cells: number[]; ghost?: s
   const y = Math.min(...cells.map(c => cellY(grid, c)));
   const size = Math.sqrt(cells.length) * grid.dx;
   if (ghost) return <mesh geometry={box} position={[x, y + 0.3, z]} scale={[size, 0.6, size]}><meshBasicMaterial color={ghost} transparent opacity={0.45} depthWrite={false} /></mesh>;
+  // a sunken planted bed: concrete kerb, dark soil, low faceted shrubs
   return (
     <group position={[x, y, z]}>
-      <mesh geometry={box} position={[0, 0.05, 0]} scale={[size - 0.6, 0.3, size - 0.6]} receiveShadow><meshStandardMaterial color="#3d6b35" roughness={1} /></mesh>
-      {[[-2.6, -2.2, 1.3], [2.4, -2.6, 1.1], [-2.2, 2.5, 1.2], [2.7, 2.1, 1.4], [0.2, 0.1, 1.0], [-0.4, -3.4, 0.8], [3.4, 0.4, 0.9]].map(([dx, dz, s], k) => (
-        <mesh key={k} geometry={SHRUB} position={[dx, 0.35 + s * 0.7, dz]} scale={[s, s * 0.85, s]} castShadow><meshStandardMaterial color={k % 2 ? '#4f8a3f' : '#6aa84f'} roughness={0.9} /></mesh>
+      <mesh geometry={box} position={[0, 0.12, 0]} scale={[size - 0.2, 0.24, size - 0.2]} receiveShadow><meshStandardMaterial color="#9b978f" roughness={0.9} /></mesh>
+      <mesh geometry={box} position={[0, 0.16, 0]} scale={[size - 1.0, 0.24, size - 1.0]} receiveShadow><meshStandardMaterial color="#3e3527" roughness={1} /></mesh>
+      {PLANTS.map(([dx, dz, s], k) => (
+        <mesh key={k} geometry={SHRUB} position={[dx, 0.3 + s * 0.55, dz]} rotation={[0, k * 1.7, 0]} scale={[s, s * 0.8, s]} castShadow><meshStandardMaterial color={PLANT_GREENS[k % PLANT_GREENS.length]} roughness={0.9} flatShading /></mesh>
       ))}
     </group>
   );
@@ -52,11 +58,12 @@ function Garden({ grid, cells, ghost }: { grid: Grid; cells: number[]; ghost?: s
 function Pit({ grid, cell, ghost }: { grid: Grid; cell: number; ghost?: string }) {
   const p: [number, number, number] = [cellX(grid, cell), cellY(grid, cell), cellZ(grid, cell)];
   if (ghost) return <mesh geometry={RING} position={[p[0], p[1] + 0.4, p[2]]} scale={1.3}><meshBasicMaterial color={ghost} transparent opacity={0.6} depthWrite={false} /></mesh>;
+  // a round concrete cover with an iron grate, and a thin amber ring on the ground so it can be found from afar
   return (
     <group position={p}>
-      <mesh geometry={RING} position={[0, 0.25, 0]} castShadow><meshStandardMaterial color="#b7b2a6" roughness={0.8} /></mesh>
-      <mesh geometry={DISK} position={[0, 0.2, 0]}><meshStandardMaterial color="#1b1712" roughness={1} /></mesh>
-      <mesh geometry={PIN} position={[0, 4.2, 0]}><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.6} /></mesh>
+      <mesh geometry={COVER_LID} position={[0, 0.12, 0]} castShadow receiveShadow><meshStandardMaterial color="#a8a49b" roughness={0.85} /></mesh>
+      <mesh geometry={GRATE} position={[0, 0.22, 0]}><meshStandardMaterial color="#2a2722" roughness={0.6} metalness={0.4} /></mesh>
+      <mesh geometry={HALO} position={[0, 0.08, 0]}><meshBasicMaterial color="#fbbf24" transparent opacity={0.7} toneMapped={false} depthWrite={false} /></mesh>
     </group>
   );
 }
@@ -64,7 +71,7 @@ function Pit({ grid, cell, ghost }: { grid: Grid; cell: number; ghost?: string }
 function Item({ grid, iv }: { grid: Grid; iv: Intervention }) {
   if (iv.type === 'garden') return <Garden grid={grid} cells={iv.cells!} />;
   if (iv.type === 'pit') return <Pit grid={grid} cell={iv.cells![0]} />;
-  if (iv.type === 'drain') return <><Segments grid={grid} cells={iv.cells!} color="#d7d3ca" /><Segments grid={grid} cells={iv.cells!} color="#38bdf8" y={0.52} w={0.45} h={0.08} /></>;
+  if (iv.type === 'drain') return <><Segments grid={grid} cells={iv.cells!} color="#c9c5bc" y={0.15} h={0.3} w={1.5} /><Segments grid={grid} cells={iv.cells!} color="#38bdf8" y={0.33} w={0.55} h={0.06} /></>;
   if (iv.type === 'desilt') return <Segments grid={grid} cells={grid.unitCells.get(iv.unit!) ?? []} color="#a78bfa" y={0.42} w={0.8} h={0.12} />;
   return null;   // rooftop tanks are drawn by <Buildings>
 }
@@ -80,6 +87,7 @@ export function Interventions() {
       return unit >= 0 ? { kind: 'desilt' as const, cells: grid.unitCells.get(unit) ?? [], ok: !validate(grid, { id: 'g', type: 'desilt', unit }, plan) } : null;
     }
     if (tool === 'drain') return { kind: 'cell' as const, cells: [hover.cell], ok: !validate(grid, { id: 'g', type: 'drain', cells: [hover.cell] }, plan) };
+    if (tool !== 'garden' && tool !== 'pit') return null;
     const cells = footprintFor(tool, grid, hover.cell);
     return { kind: tool, cells, ok: !validate(grid, { id: 'g', type: tool, cells }, plan) };
   }, [hover, tool, grid, plan]);

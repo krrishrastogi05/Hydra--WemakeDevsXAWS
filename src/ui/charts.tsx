@@ -55,7 +55,7 @@ export function CompareBars({ rows, keys }: { rows: BarRow[]; keys: SeriesKey[] 
 }
 
 /** Time series lines on one shared axis, with a crosshair tooltip. */
-export function LineSeries({ series, unit, fmt, xLabel = 'minutes after rain starts' }: { series: { key: SeriesKey; xs: ArrayLike<number>; ys: ArrayLike<number> }[]; unit: string; fmt: (v: number) => string; xLabel?: string }) {
+export function LineSeries({ series, unit, fmt, xLabel = 'minutes after rain starts', xFmt = (v: number) => `${Math.round(v)} min` }: { series: { key: SeriesKey; xs: ArrayLike<number>; ys: ArrayLike<number> }[]; unit: string; fmt: (v: number) => string; xLabel?: string; xFmt?: (v: number) => string }) {
   const [hx, setHx] = useState<number | null>(null);
   const W = 300, H = 120, L = 34, B = 18, T = 8;
   const { xmax, ymax } = useMemo(() => {
@@ -72,7 +72,7 @@ export function LineSeries({ series, unit, fmt, xLabel = 'minutes after rain sta
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${unit} over time`}
         onMouseMove={e => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const x = ((e.clientX - r.left) / r.width * W - L) / (W - L - 6) * xmax; setHx(Math.max(0, Math.min(xmax, x))); }}>
         {ticks.map(t => <g key={t}><line x1={L} x2={W - 6} y1={sy(t)} y2={sy(t)} className="c-grid" /><text x={L - 5} y={sy(t) + 3} className="c-axis" textAnchor="end">{fmt(t)}</text></g>)}
-        <text x={L} y={H - 4} className="c-axis">0</text><text x={W - 6} y={H - 4} className="c-axis" textAnchor="end">{Math.round(xmax)} min</text>
+        <text x={L} y={H - 4} className="c-axis">{xFmt(0).replace(/ min$/, '')}</text><text x={W - 6} y={H - 4} className="c-axis" textAnchor="end">{xFmt(xmax)}</text>
         <text x={(L + W) / 2} y={H - 4} className="c-axis" textAnchor="middle">{xLabel}</text>
         {series.map(s => {
           let d = '';
@@ -84,7 +84,7 @@ export function LineSeries({ series, unit, fmt, xLabel = 'minutes after rain sta
       </svg>
       {hx != null && (
         <div className="tip" style={{ left: `${(sx(hx) / W) * 100}%`, top: 24 }}>
-          <b>{Math.round(hx)} min</b>
+          <b>{xFmt(hx)}</b>
           {series.map(s => <div key={s.key}>{SERIES[s.key].name}: {fmt(s.ys[at(s, hx)])} {unit}</div>)}
         </div>
       )}

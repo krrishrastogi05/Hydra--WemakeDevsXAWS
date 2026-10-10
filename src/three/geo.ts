@@ -1,5 +1,5 @@
 // Grid <-> world helpers. World: x east, z south, y up (metres). Terrain relief is exaggerated x2 for readability.
-import type { Grid } from '../sim/model';
+import type { Grid } from '../sim/grid';
 
 export const VE = 2;
 export const half = (g: Grid) => (g.nx * g.dx) / 2;

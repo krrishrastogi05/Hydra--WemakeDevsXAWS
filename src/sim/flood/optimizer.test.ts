@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { loadGrid, planCost, STORMS, CATALOG } from './model';
+import { loadGrid } from '../grid';
+import { planCost, STORMS, CATALOG } from './model';
 import { simulate } from './engine';
 import { evenSpread, optimize } from './optimizer';
-import type { SiteData } from './types';
+import type { SiteData } from '../types';
 
 const load = (id: string) => loadGrid(JSON.parse(fs.readFileSync(`public/data/${id}.json`, 'utf8')) as SiteData);
 const opt = { storm: STORMS.find(s => s.id === 'veryheavy')!, antecedent: 'normal' as const };
