@@ -49,10 +49,10 @@ Needs the AWS CLI and the AWS SAM CLI, with credentials for the target account.
 ```bash
 npm install
 npm run build              # bundles the two Lambdas into dist/
-sam deploy --guided        # first time; later just: sam deploy
+sam deploy                 # updates the live stack, settings in samconfig.toml
 ```
 
-The only parameter is `AllowOrigin`: `*` while testing, then your Amplify URL. Copy the `ApiUrl` output into Amplify as the environment variable `VITE_API_URL` and redeploy the app.
+`samconfig.toml` holds the live stack's settings: `hydra-api` in `ap-south-1`, with `AllowOrigin` set to the demo's URL (the only parameter; `*` allows any site). For a stack of your own, run `sam deploy --guided` instead and save the answers under a new name. The app finds the API through `VITE_API_URL` at build time; for the live demo that is set in `.github/workflows/deploy.yml`, so a new stack's `ApiUrl` output goes there.
 
 The stack creates an HTTP API (throttled to 10 requests per second), two Lambdas (Node.js 22, arm64), one DynamoDB table (on-demand) and one private S3 bucket. Remove it all with `sam delete`.
 

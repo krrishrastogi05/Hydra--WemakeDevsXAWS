@@ -11,6 +11,8 @@ HYDRA is an interactive 3D simulator of a real Indian neighbourhood (Gurugram, C
 
 In both modes you re-run the *same* conditions to compare before and after, let HYDRA's optimizer spend the budget for you, and pit it against spending the same money without a plan. The two modes share the neighbourhood, the camera and the layout; their models, plans, budgets and results are completely separate.
 
+> **Live demo:** https://main.d3dmcevnvvv968.amplifyapp.com (AWS Amplify, with the backend on AWS Lambda, DynamoDB and S3).
+>
 > Project direction, status and next steps: [DIRECTION.md](DIRECTION.md).
 
 > **Thesis, shown on screen:** the right infrastructure in the right places reduces monsoon flood damage far more than the same budget spent evenly.
@@ -177,11 +179,12 @@ npm run api:test     # API tests (no AWS, no network)
 
 ## Deploy on AWS
 
-The app is a static site; the engine runs in the browser.
-- **AWS Amplify Hosting:** connect the repo; `amplify.yml` builds `dist/`.
-- **S3 + CloudFront:** `npm run build`, upload `dist/` to a bucket, and serve it through CloudFront with the default root object `index.html`.
+The live demo runs in `ap-south-1` (Mumbai):
 
-The backend is an AWS SAM stack: `cd backend && npm run build && sam deploy --guided`. Then set the stack's `ApiUrl` output as `VITE_API_URL` in Amplify's environment variables and rebuild the app. Without `VITE_API_URL` a production build stays a plain static site. Details: [backend/README.md](backend/README.md).
+- **App:** an AWS Amplify Hosting app. Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): typecheck, tests, `npm run build` with `VITE_API_URL` set to the API, then upload to Amplify. It signs in to AWS through GitHub's OIDC login, so the repo holds no AWS keys.
+- **Backend:** the AWS SAM stack `hydra-api`. It is not redeployed on push; after changing `backend/`, run `cd backend && npm run build && sam deploy`. Details: [backend/README.md](backend/README.md).
+
+To host it elsewhere: the app is a static site, so `npm run build` and serve `dist/` from Amplify (`amplify.yml` is the build spec for a Git-connected app) or from S3 + CloudFront with the default root object `index.html`. Without `VITE_API_URL` a production build stays a plain static site without share links or "+ Area".
 
 ## Roadmap
 
