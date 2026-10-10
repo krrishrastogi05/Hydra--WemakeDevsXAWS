@@ -1,5 +1,7 @@
 // App state (zustand). The UI never computes hydrology: every number comes from an engine result in here.
 import { create } from 'zustand';
+import { API_URL, api, checkBackend, rememberArea, savedAreas, siteDataUrl, useBackend } from './api';
+import { isCustomSite } from './shared/area';
 import { engine, type OptimizeResult, type ShowdownResult } from './simClient';
 import { loadGrid, type Grid } from './sim/grid';
 import { CATALOG, STORMS, costOf, gardenFootprint, planCost, validate } from './sim/flood/model';
@@ -27,10 +29,11 @@ interface State {
   panel: Panel; busy: { p: number; msg: string } | null;
   recommendation: OptimizeResult | null; showdown: ShowdownResult | null;
   toast: { msg: string; kind: 'info' | 'error' } | null; flyTo: { x: number; z: number; t: number } | null;
-  onboarding: boolean;
+  onboarding: boolean; addArea: boolean;
   quality: Quality; qualityChosen: boolean; setQuality: (q: Quality) => void;
   // actions
-  init: () => Promise<void>;
+  /** Loads the site list and the first site: `siteId`, else the one in the URL hash. `demos: false` skips ?demo= links. */
+  init: (opts?: { siteId?: string; demos?: boolean }) => Promise<void>;
   loadSite: (id: string) => Promise<void>;
   setStorm: (id: string) => void; setAntecedent: (a: Antecedent) => void; setBudget: (b: number) => void;
   runBaseline: () => Promise<void>; runPlan: (autoplay?: boolean) => Promise<void>;
@@ -65,7 +68,7 @@ export const useStore = create<State>((set, get) => ({
   view: 'baseline', peak: true, time: 0, playing: false, speed: 1,
   overlay: 'none', showLabels: true, showDrains: true,
   panel: 'results', busy: null, recommendation: null, showdown: null,
-  toast: null, flyTo: null,
+  toast: null, flyTo: null, addArea: false,
   onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1'; } catch { return true; } })(),
   quality: (() => { try { return localStorage.getItem('hydra-quality') === 'low' ? 'low' : 'high'; } catch { return 'high'; } })(),
   // a choice the viewer made by hand is never overridden by the automatic fallback
@@ -75,12 +78,21 @@ export const useStore = create<State>((set, get) => ({
   set: p => set(p),
   notify: (msg, kind = 'info') => { clearTimeout(toastTimer); set({ toast: { msg, kind } }); toastTimer = setTimeout(() => set({ toast: null }), 3800); },
 
-  init: async () => {
+  init: async (opts = {}) => {
     try {
-      const sites = await (await fetch(`${import.meta.env.BASE_URL}data/sites.json`)).json() as SiteSummary[];
-      const fromHash = location.hash.slice(1).split('/')[0];
+      const [demoSites] = await Promise.all([
+        fetch(`${import.meta.env.BASE_URL}data/sites.json`).then(r => r.json() as Promise<SiteSummary[]>),
+        checkBackend(),
+      ]);
+      // areas added through the API (remembered by this browser) follow the bundled demo sites
+      let sites = [...demoSites, ...(API_URL ? savedAreas() : [])];
+      const want = opts.siteId ?? location.hash.slice(1).split('/')[0];
+      if (isCustomSite(want) && !sites.some(s => s.id === want) && useBackend.getState().status === 'up') {
+        try { const a = await api.getArea(want); if (a.status === 'ready' && a.summary) sites = [...demoSites, ...rememberArea(a.summary)]; } catch { /* unknown area: fall back below */ }
+      }
       set({ sites });
-      await get().loadSite(sites.some(s => s.id === fromHash) ? fromHash : 'gurugram');
+      await get().loadSite(sites.some(s => s.id === want) ? want : 'gurugram');
+      if (opts.demos === false) return;
       // demo links: ?demo=showdown runs the budget showdown, ?demo=plan applies HYDRA's recommendation and plays the storm
       const demo = get().mode === 'flood' ? new URLSearchParams(location.search).get('demo') : null;   // heat demos: heatStore.ts
       if (demo === 'showdown') get().runShowdown();
@@ -89,8 +101,17 @@ export const useStore = create<State>((set, get) => ({
   },
 
   loadSite: async id => {
-    set({ loading: 'Loading neighbourhood data…', siteId: id, plan: [], undoStack: [], baseline: null, current: null, currentKey: '', recommendation: null, showdown: null, selection: null, hover: null, draft: null, playing: false, time: 0 });
-    const site = await (await fetch(`${import.meta.env.BASE_URL}data/${id}.json`)).json() as SiteData;
+    set({ loading: 'Loading neighbourhood data…' });
+    let site: SiteData;
+    try {
+      const res = await fetch(siteDataUrl(id, 'data'));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      site = await res.json() as SiteData;
+    } catch (e) {
+      if (!get().site) throw e;   // first load: init shows the error screen
+      set({ loading: null }); get().notify(`Could not open this neighbourhood (${(e as Error).message})`, 'error'); return;
+    }
+    set({ siteId: id, plan: [], undoStack: [], baseline: null, current: null, currentKey: '', recommendation: null, showdown: null, selection: null, hover: null, draft: null, playing: false, time: 0 });
     const grid = loadGrid(site);
     writeHash(id, get().mode);
     set({ site, grid, loading: 'Preparing the flood engine…' });

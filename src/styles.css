@@ -148,6 +148,49 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 .about ol, .about ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); }
 .about p { margin: 0; color: var(--ink-2); }
 
+/* ---------- share link, officer brief, add your own area ---------- */
+.share-report { display: grid; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--edge); }
+.share-report .btn small { font-weight: 500; }
+.sharelink { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--edge-2); background: rgba(255,255,255,.04); color: var(--ink); font-size: 12px; }
+.brief-head { display: flex; align-items: center; gap: 12px; }
+.brief-head h2 { flex: 1; }
+.brief-head .close { color: var(--ink-3); }
+.langs { display: flex; padding: 2px; border: 1px solid var(--edge); border-radius: 9px; }
+.langs button { border: 0; background: none; padding: 4px 11px; border-radius: 7px; color: var(--ink-2); font-weight: 600; }
+.langs button.on { background: rgba(56, 189, 248, .16); color: var(--ink); }
+.modal.brief { width: min(780px, calc(100vw - 32px)); max-height: calc(100vh - 40px); grid-template-rows: auto minmax(0, 1fr) auto auto; }
+.brief-body { overflow: auto; min-height: 220px; padding: 16px 20px; border-radius: 12px; background: #f8fafc; color: #1e293b; font-size: 13.5px; line-height: 1.6; }
+.brief-body h3 { margin: 14px 0 4px; font-size: 14px; color: #0f172a; }
+.brief-body h3:first-child { margin-top: 0; font-size: 17px; }
+.brief-body p { margin: 4px 0; }
+.brief-body ul { margin: 4px 0; padding-left: 20px; }
+.brief-body li { margin: 3px 0; }
+.brief-body[lang="hi"], .langs button:last-child { font-family: var(--font), "Noto Sans Devanagari", sans-serif; }
+.modal.addarea { width: min(740px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
+.modal.addarea h4 { margin: 2px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); }
+.area-search { display: flex; gap: 8px; }
+.area-search input, .area-form input, .area-form select { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--edge-2); background: rgba(255,255,255,.05); color: var(--ink); font-size: 13px; text-transform: none; letter-spacing: 0; }
+.area-form select option { background: var(--panel-solid); }
+.places { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; font-size: 12px; max-height: 130px; overflow: auto; }
+.places .link { text-align: left; font-weight: 500; }
+.areamap { height: 300px; border-radius: 12px; overflow: hidden; border: 1px solid var(--edge); background: #0d1621; }
+.area-form { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.5fr; gap: 8px; }
+.area-form label { display: grid; gap: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.row-actions .fine { align-self: center; }
+.chip { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--edge-2); background: rgba(255,255,255,.04); color: var(--ink); font-size: 12px; }
+.chip:hover:not(:disabled) { border-color: var(--accent); }
+.progress .bar.indeterminate i { width: 35%; animation: slide 1.3s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.cities button.custom { color: #c4b5fd; }
+.cities button.add { border: 1px dashed var(--edge-2); color: var(--accent); }
+.cities button.add span { display: inline-flex; align-items: center; gap: 4px; }
+@media print {
+  body { overflow: visible; background: #fff; }
+  body * { visibility: hidden; }
+  .print-brief, .print-brief * { visibility: visible; }
+  .print-brief { position: absolute; left: 0; top: 0; width: 100%; overflow: visible; background: #fff; font-size: 12pt; }
+}
+
 /* ---------- charts ---------- */
 .chart { position: relative; }
 .legend-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; font-size: 11.5px; color: var(--ink-2); }
@@ -237,4 +280,5 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 @media (max-width: 1440px) { .topbar { gap: 10px; } .cities small { display: none; } .controls { gap: 7px; } .controls select { max-width: 140px; } .btn { padding: 7px 10px; } .meter { min-width: 90px; } }
 @media (max-width: 1280px) { :root { --panel-w: 330px; } .logo span { display: none; } .meter { display: none; } .controls select { max-width: 118px; } }
 @media (max-width: 1000px) { .maplegend { display: none; } .cities small { display: none; } .meter { display: none; } }
-@media (prefers-reduced-motion: reduce) { .loader .drop { animation: none; } }
+@media (max-width: 760px) { .area-form { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .loader .drop, .progress .bar.indeterminate i { animation: none; } }

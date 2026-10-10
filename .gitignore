@@ -3,3 +3,6 @@ dist
 *.log
 .DS_Store
 .env*
+backend/.data
+backend/dist
+backend/.aws-sam

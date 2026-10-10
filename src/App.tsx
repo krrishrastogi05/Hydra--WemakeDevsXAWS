@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useStore, type Tool } from './store';
+import { boot } from './sharedPlan';
 import { Scene } from './three/Scene';
 import { MapLegend, Onboarding, Toast, Toolbar, TopBar } from './ui/Chrome';
 import { SidePanel } from './ui/Panel';
@@ -10,11 +11,12 @@ import { DAY_START } from './sim/heat/model';
 
 const KEYS: Record<string, Tool> = { '1': 'drain', '2': 'garden', '3': 'rwh', '4': 'pit', '5': 'desilt', v: 'inspect', x: 'erase' };
 const HEAT_KEYS: Record<string, Tool> = { '1': 'tree', '2': 'canopy', '3': 'walkway', '4': 'coolroof', v: 'inspect', x: 'erase' };
+const AddArea = lazy(() => import('./ui/AddArea'));   // brings Leaflet, so only when opened
 
 export default function App() {
   const loading = useStore(s => s.loading), error = useStore(s => s.error), ready = useStore(s => !!s.grid && !!s.baseline), mode = useStore(s => s.mode);
-  const heatLoading = useHeat(s => s.loading);
-  useEffect(() => { useStore.getState().init(); }, []);
+  const heatLoading = useHeat(s => s.loading), addArea = useStore(s => s.addArea);
+  useEffect(() => { boot(); }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, select, textarea')) return;
@@ -51,6 +53,7 @@ export default function App() {
       )}
       <Toast />
       {ready && <Onboarding />}
+      {addArea && <Suspense fallback={null}><AddArea /></Suspense>}
       {(loading || error) && <div className="loader"><div className="drop" /><p>{error ?? loading}</p></div>}
       {!loading && !error && mode === 'heat' && heatLoading && <div className="loader soft"><div className="drop sun" /><p>Tracing the sun across the neighbourhood…</p></div>}
     </div>
