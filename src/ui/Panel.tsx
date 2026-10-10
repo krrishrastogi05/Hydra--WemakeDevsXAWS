@@ -12,6 +12,7 @@ import { cellX, cellZ, half } from '../three/geo';
 import { useHeat } from '../heatStore';
 import { HeatTab } from './heat/HeatPanel';
 import { ShareReport } from './Share';
+import { CalcSourceTag, ProgressBar } from './calc';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 const m3 = (v: number) => `${num(Math.round(v))} m³`;
@@ -50,6 +51,7 @@ function Results() {
   return (
     <div className="tab">
       <p className="sub">{storm.name}: {storm.note}</p>
+      <CalcSourceTag source={shown.source} />
       {stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)} disabled={s.running}>Run the same storm again</button> to update these numbers.</div>}
       {!a && !s.plan.length && <div className="callout soft">These are the results with <b>no action</b>. Place interventions, or press <b>Recommend</b>, then run the same storm to compare.</div>}
       <div className="kpis">
@@ -78,7 +80,7 @@ function Results() {
       <ol className="hotspots">
         {shown.hotspots.slice(0, 6).map((h, k) => (
           <li key={k}><button onClick={() => useStore.setState({ flyTo: { x: h.x - half(s.grid!), z: h.z - half(s.grid!), t: Date.now() } })}>
-            <b>{h.road}</b><span>{Math.round(h.maxDepth * 100)} cm deep · {num(h.area)} m²{h.buildingsFlooded ? ` · ${h.buildingsFlooded} homes take water` : ''}</span>
+            <b>{h.road}</b><span>{Math.round(h.maxDepth * 100)} cm deep · {num(h.area)} m²{h.buildingsFlooded ? ` · ${h.buildingsFlooded} ${h.buildingsFlooded === 1 ? 'home takes' : 'homes take'} water` : ''}</span>
           </button></li>
         ))}
         {!shown.hotspots.length && <li className="muted">No street is under more than 15 cm.</li>}
@@ -127,9 +129,7 @@ function PlanTab() {
 }
 
 function Progress() {
-  const busy = useStore(s => s.busy);
-  if (!busy) return null;
-  return <div className="progress"><div className="bar"><i style={{ width: `${Math.round(busy.p * 100)}%` }} /></div><span>{busy.msg}</span></div>;
+  return <ProgressBar busy={useStore(s => s.busy)} />;
 }
 
 function mix(plan: Intervention[]) {
@@ -154,6 +154,7 @@ function RecommendTab() {
       {r && !s.busy && (
         <>
           <h4>Predicted result <small>({fmtINR(r.cost)} spent, {r.plan.length} interventions)</small></h4>
+          <CalcSourceTag source={r.source} />
           <CompareBars keys={['none', 'hydra']} rows={rows(b, r.metrics)} />
           <div className="chips">{mix(r.plan).map(([t, n]) => <span key={t} style={{ ['--tc' as string]: CATALOG[t].color }}><i />{n} × {CATALOG[t].short}</span>)}</div>
           <div className="row-actions"><button className="btn primary" onClick={() => { s.setPlan(r.plan); useStore.setState({ panel: 'results' }); }}>Apply and run the storm</button></div>
@@ -209,6 +210,7 @@ function ShowdownTab() {
       {sd && !s.busy && (
         <>
           {headline}
+          <CalcSourceTag source={sd.source} />
           <CompareBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
           <p className="fine">Spent: even spread {fmtINR(sd.spreads.reduce((a, x) => a + x.cost, 0) / sd.spreads.length)} on average, HYDRA {fmtINR(sd.hydra.cost)}. HYDRA's mix: {mix(sd.hydra.plan).map(([t, n]) => `${n} ${CATALOG[t].short.toLowerCase()}`).join(', ')}.</p>
           <div className="row-actions">

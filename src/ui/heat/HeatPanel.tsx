@@ -12,6 +12,7 @@ import type { HeatIntervention, HeatInterventionType, HeatMetrics, HeatResult, H
 import { CompareBars, LineSeries, type BarRow } from '../charts';
 import { Icon } from '../Chrome';
 import { ShareReport } from '../Share';
+import { CalcSourceTag, ProgressBar } from '../calc';
 import { cellX, cellZ, half } from '../../three/geo';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
@@ -65,6 +66,7 @@ function Results() {
   return (
     <div className="tab">
       <p className="sub">{sc.note} Looking at the <b>{win.name.toLowerCase()}</b>.</p>
+      <CalcSourceTag source={shown.source} />
       <div className="callout soft">Air in the shade: heat index <b>{num(s.baseline.heatIndexC, 1)} °C</b> (NOAA band: {heatIndexBand(s.baseline.heatIndexC)}). Sun and hot surfaces add to that on exposed streets, which is what the index below compares.</div>
       {stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)} disabled={s.running}>Run the same day again</button> to update these numbers.</div>}
       {!a && !s.plan.length && <div className="callout soft">These are the results with <b>no action</b>. Plant trees or add canopies (keys 1–4), or press <b>Recommend</b>, then run the same day to compare.</div>}
@@ -133,9 +135,7 @@ function PlanTab() {
 }
 
 function Progress() {
-  const busy = useHeat(s => s.busy);
-  if (!busy) return null;
-  return <div className="progress"><div className="bar"><i style={{ width: `${Math.round(busy.p * 100)}%` }} /></div><span>{busy.msg}</span></div>;
+  return <ProgressBar busy={useHeat(s => s.busy)} />;
 }
 function mix(plan: HeatIntervention[]) {
   const m = new Map<HeatInterventionType, number>();
@@ -174,6 +174,7 @@ function RecommendTab() {
       {r && !s.busy && (
         <>
           <h4>Predicted result <small>({fmtINR(r.cost)} spent, {r.plan.length} interventions)</small></h4>
+          <CalcSourceTag source={r.source} />
           <CompareBars keys={['none', 'hydra']} rows={rows(b, r.metrics)} />
           <div className="chips">{mix(r.plan).map(([t, n]) => <span key={t} style={{ ['--tc' as string]: HEAT_CATALOG[t].color }}><i />{n} × {HEAT_CATALOG[t].short}</span>)}</div>
           <div className="row-actions"><button className="btn primary" onClick={() => { s.setPlan(r.plan); useStore.setState({ panel: 'results' }); }}>Apply and run the day</button></div>
@@ -213,6 +214,7 @@ function ShowdownTab() {
       {sd && !s.busy && (
         <>
           {headline}
+          <CalcSourceTag source={sd.source} />
           <CompareBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
           <p className="fine">Spent: even spread {fmtINR(sd.spreads.reduce((a, x) => a + x.cost, 0) / sd.spreads.length)} on average, HYDRA {fmtINR(sd.hydra.cost)}. HYDRA's mix: {mix(sd.hydra.plan).map(([t, n]) => `${n} ${HEAT_CATALOG[t].short.toLowerCase()}${n > 1 ? 's' : ''}`).join(', ')}.</p>
           <div className="row-actions">
