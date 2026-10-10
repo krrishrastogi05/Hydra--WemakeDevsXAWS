@@ -5,7 +5,7 @@
 // (so two trees shading the same footpath are not double counted), and the state is updated exactly after each pick.
 import { COVER } from '../types';
 import type { Grid } from '../grid';
-import { HEAT_CATALOG, HEAT_PARAMS as P, STEP_H, heatCostOf, occupiedCells, validateHeat } from './model';
+import { HEAT_CATALOG, HEAT_PARAMS as P, STEP_H, heatCostOf, heatPlanCost, occupiedCells, validateHeat } from './model';
 import { applyIntervention, buildObstacles, sunRay, transmit, type Obstacles } from './shadow';
 import { ambientTerm, cellIndex, inWindow, pedestrianWeights, simulateHeat, sunSteps, windFactor } from './engine';
 import { heatIndexC } from './solar';
@@ -156,6 +156,28 @@ export function optimizeHeat(g: Grid, hs: HeatSite, opt: HeatOptimizeOptions): {
   }
   opt.onProgress?.(0.97, 'Re-running the full sun path with the plan');
   return { plan, result: simulateHeat(g, hs, plan, { ...opt, keepFrames: false }) };
+}
+
+type Progress = (p: number, msg: string) => void;
+
+/** HYDRA's shade recommendation for a budget, as the panels show it. Used by the Web Worker and the API alike. */
+export function recommendHeat(g: Grid, hs: HeatSite, opts: HeatOptions, budget: number, base: HeatIntervention[], onProgress?: Progress) {
+  const o = optimizeHeat(g, hs, { ...opts, budget, base, onProgress });
+  return { plan: o.plan, metrics: o.result.metrics, cost: heatPlanCost(g, o.plan) };
+}
+
+/** Budget showdown: no action vs three even-spread shade plans vs HYDRA's plan, on the same day and budget. */
+export function showdownHeat(g: Grid, hs: HeatSite, opts: HeatOptions, budget: number, onProgress?: Progress) {
+  const quick = { ...opts, keepFrames: false };
+  onProgress?.(0.02, 'Tracing the sun with no action');
+  const base = simulateHeat(g, hs, [], quick).metrics;
+  const spreads = [1, 2, 3].map((seed, k) => {
+    onProgress?.(0.06 + k * 0.1, `Even spread, random plan ${k + 1} of 3`);
+    const plan = heatEvenSpread(g, hs, budget, seed);
+    return { plan, cost: heatPlanCost(g, plan), metrics: simulateHeat(g, hs, plan, quick).metrics };
+  });
+  const o = optimizeHeat(g, hs, { ...opts, budget, onProgress: (p, msg) => onProgress?.(0.36 + p * 0.62, `HYDRA · ${msg}`) });
+  return { budget, base, spreads, hydra: { plan: o.plan, cost: heatPlanCost(g, o.plan), metrics: o.result.metrics } };
 }
 
 /** The same money spread evenly: trees and canopies at random pedestrian spots, ignoring where the heat is. */

@@ -222,6 +222,28 @@ export function optimize(g: Grid, opt: OptimizeOptions): { plan: Intervention[];
   return { plan, result: res, rounds: impacts };
 }
 
+type Progress = (p: number, msg: string) => void;
+
+/** HYDRA's recommendation for a budget, as the panels show it. Used by the Web Worker and the API alike. */
+export function recommend(g: Grid, opts: SimOptions, budget: number, base: Intervention[], onProgress?: Progress) {
+  const o = optimize(g, { ...opts, budget, base, onProgress });
+  return { plan: o.plan, metrics: o.result.metrics, cost: planCost(g, o.plan), rounds: o.rounds };
+}
+
+/** Budget showdown: no action vs three even-spread plans vs HYDRA's plan, under the same storm and budget. */
+export function showdown(g: Grid, opts: SimOptions, budget: number, onProgress?: Progress) {
+  const quick = { ...opts, keepFrames: false };
+  onProgress?.(0.02, 'Simulating the neighbourhood with no action');
+  const base = simulate(g, [], quick).metrics;
+  const spreads = [1, 2, 3].map((seed, k) => {
+    onProgress?.(0.06 + k * 0.1, `Even spread, random plan ${k + 1} of 3`);
+    const plan = evenSpread(g, budget, seed);
+    return { plan, cost: planCost(g, plan), metrics: simulate(g, plan, quick).metrics };
+  });
+  const o = optimize(g, { ...opts, budget, onProgress: (p, msg) => onProgress?.(0.36 + p * 0.62, `HYDRA · ${msg}`) });
+  return { budget, base, spreads, hydra: { plan: o.plan, cost: planCost(g, o.plan), metrics: o.result.metrics } };
+}
+
 function rng(seed: number) { let a = seed | 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /** "No data" plan: the same budget split evenly across four types, placed at random valid spots. */

@@ -56,4 +56,5 @@ export interface SimResult {
   lakeInflow: Float32Array;          // m3 that reached each low spot
   metrics: Metrics; budget: WaterBudget; hotspots: Hotspot[];
   cost: number; runtimeMs: number;
+  source?: 'server' | 'browser';        // where it was calculated (set by src/simClient.ts, not the engine)
 }

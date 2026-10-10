@@ -14,11 +14,12 @@ const TYPES = { flood: ['drain', 'garden', 'rwh', 'pit', 'desilt'], heat: ['tree
 const SOURCES = ['user', 'hydra', 'spread'];
 const MAX = { items: 1500, cells: 600 };
 
+export const word = (v: unknown, max = 40) => typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v) && v.length <= max;
+const int = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) < 1e7;
+
 /** Returns an error message, or null when the plan is well formed (whether it fits the site is checked when it loads). */
 export function validateNewPlan(x: unknown): string | null {
   const p = x as NewPlan;
-  const word = (v: unknown, max = 40) => typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v) && v.length <= max;
-  const int = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) < 1e7;
   if (!p || typeof p !== 'object') return 'Expected a JSON object';
   if (!word(p.siteId)) return 'siteId is malformed';
   if (typeof p.siteName !== 'string' || p.siteName.length > 120) return 'siteName is malformed';
@@ -26,9 +27,15 @@ export function validateNewPlan(x: unknown): string | null {
   const s = p.settings as Partial<FloodSettings & HeatSettings>;
   if (!s || typeof s.budget !== 'number' || !(s.budget > 0 && s.budget <= 1e10)) return 'settings.budget is malformed';
   if (p.mode === 'flood' ? !word(s.stormId) || !word(s.antecedent) : !word(s.scenarioId) || !word(s.windowId)) return 'settings are malformed';
-  if (!Array.isArray(p.plan) || !p.plan.length || p.plan.length > MAX.items) return `plan must have 1–${MAX.items} interventions`;
-  for (const iv of p.plan as (Intervention | HeatIntervention)[]) {
-    if (!iv || typeof iv !== 'object' || !word(iv.id) || !TYPES[p.mode].includes(iv.type)) return 'plan has an unknown intervention';
+  if (!Array.isArray(p.plan) || !p.plan.length) return `plan must have 1–${MAX.items} interventions`;
+  return validateItems(p.mode, p.plan);
+}
+
+/** Checks the shape of each intervention in a flood or heat plan (placement on the map is checked against the grid). */
+export function validateItems(mode: 'flood' | 'heat', plan: unknown): string | null {
+  if (!Array.isArray(plan) || plan.length > MAX.items) return `plan must be a list of at most ${MAX.items} interventions`;
+  for (const iv of plan as (Intervention | HeatIntervention)[]) {
+    if (!iv || typeof iv !== 'object' || !word(iv.id) || !TYPES[mode].includes(iv.type)) return 'plan has an unknown intervention';
     if (iv.cells != null && (!Array.isArray(iv.cells) || iv.cells.length > MAX.cells || !iv.cells.every(int))) return 'plan has malformed cells';
     if (iv.building != null && !int(iv.building)) return 'plan has a malformed building';
     if ('unit' in iv && iv.unit != null && !int(iv.unit)) return 'plan has a malformed drain';
