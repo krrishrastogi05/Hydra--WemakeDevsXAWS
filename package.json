@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "data": "node scripts/fetch-site.mjs"
+    "data": "node scripts/fetch-site.mjs",
+    "data:heat": "node scripts/fetch-heat.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
