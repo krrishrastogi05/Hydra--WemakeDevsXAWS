@@ -5,12 +5,17 @@ import { loadGrid, type Grid } from './sim/grid';
 import { CATALOG, STORMS, costOf, gardenFootprint, planCost, validate } from './sim/flood/model';
 import type { SiteData, SiteSummary } from './sim/types';
 import type { Antecedent, Intervention, InterventionType, SimOptions, SimResult } from './sim/flood/types';
+import type { HeatInterventionType } from './sim/heat/types';
 
-export type Tool = 'inspect' | InterventionType | 'erase';
+// Two modes share the neighbourhood, camera, tools rail and panels; their engines, plans and results are separate
+// (flood state lives here, heat state in heatStore.ts).
+export type Mode = 'flood' | 'heat';
+export type Tool = 'inspect' | InterventionType | HeatInterventionType | 'erase';
 export type Panel = 'results' | 'plan' | 'recommend' | 'showdown' | 'about';
 export type Selection = { kind: 'cell'; cell: number } | { kind: 'building'; building: number } | null;
 
 interface State {
+  mode: Mode; setMode: (m: Mode) => void;
   sites: SiteSummary[]; siteId: string; site: SiteData | null; grid: Grid | null; loading: string | null; error: string | null;
   stormId: string; antecedent: Antecedent; budget: number;
   plan: Intervention[]; undoStack: Intervention[][];
@@ -40,7 +45,16 @@ export const simOptions = (s: Pick<State, 'stormId' | 'antecedent'>, keepFrames 
 let ivSeq = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+const modeFromUrl = (): Mode => (location.hash.split('/')[1] === 'heat' || new URLSearchParams(location.search).get('mode') === 'heat' ? 'heat' : 'flood');
+const writeHash = (id: string, mode: Mode) => history.replaceState(null, '', `#${id}${mode === 'heat' ? '/heat' : ''}`);
+
 export const useStore = create<State>((set, get) => ({
+  mode: modeFromUrl(),
+  setMode: mode => {
+    if (mode === get().mode) return;
+    set({ mode, tool: 'inspect', draft: null, selection: null, hover: null, playing: false });
+    writeHash(get().siteId, mode);
+  },
   sites: [], siteId: 'gurugram', site: null, grid: null, loading: 'Loading HYDRA…', error: null,
   stormId: 'heavy', antecedent: 'normal', budget: 50e5,
   plan: [], undoStack: [],
@@ -58,7 +72,7 @@ export const useStore = create<State>((set, get) => ({
   init: async () => {
     try {
       const sites = await (await fetch(`${import.meta.env.BASE_URL}data/sites.json`)).json() as SiteSummary[];
-      const fromHash = location.hash.slice(1);
+      const fromHash = location.hash.slice(1).split('/')[0];
       set({ sites });
       await get().loadSite(sites.some(s => s.id === fromHash) ? fromHash : 'gurugram');
       // demo links: ?demo=showdown runs the budget showdown, ?demo=plan applies HYDRA's recommendation and plays the storm
@@ -72,7 +86,7 @@ export const useStore = create<State>((set, get) => ({
     set({ loading: 'Loading neighbourhood data…', siteId: id, plan: [], undoStack: [], baseline: null, current: null, currentKey: '', recommendation: null, showdown: null, selection: null, hover: null, draft: null, playing: false, time: 0 });
     const site = await (await fetch(`${import.meta.env.BASE_URL}data/${id}.json`)).json() as SiteData;
     const grid = loadGrid(site);
-    history.replaceState(null, '', `#${id}`);
+    writeHash(id, get().mode);
     set({ site, grid, loading: 'Preparing the flood engine…' });
     await engine.load(site);
     await get().runBaseline();
@@ -133,6 +147,7 @@ export const useStore = create<State>((set, get) => ({
 }));
 
 // helpers used by the scene and tools
+export const isFloodTool = (t: Tool): t is InterventionType => t in CATALOG;
 export function footprintFor(tool: Tool, grid: Grid, cell: number): number[] {
   if (tool === 'garden') return gardenFootprint(grid, cell);
   return [cell];

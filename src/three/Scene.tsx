@@ -9,6 +9,8 @@ import { Buildings } from './Buildings';
 import { Drains, Rain, Water } from './flood/Water';
 import { Interventions } from './flood/Interventions';
 import { Markers } from './flood/Markers';
+import { HeatInterventions, HeatLights, HeatMarkers, HeatOverlay, Trees } from './heat/HeatLayer';
+import { useHeat } from '../heatStore';
 
 function CameraRig() {
   const controls = useThree(s => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
@@ -25,25 +27,47 @@ function CameraRig() {
   return null;
 }
 
-export function Scene() {
-  const grid = useStore(s => s.grid);
+function FloodLights() {
   return (
-    <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [240, 330, 470], fov: 42, near: 1, far: 5000 }}>
+    <>
       <fog attach="fog" args={['#0d1621', 900, 2200]} />
       <hemisphereLight args={['#c9dcf5', '#5a4636', 0.75]} />
       <ambientLight intensity={0.18} />
       <directionalLight position={[-260, 420, 220]} intensity={1.65} castShadow
         shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
         shadow-camera-left={-420} shadow-camera-right={420} shadow-camera-top={420} shadow-camera-bottom={-420} shadow-camera-far={1500} />
+    </>
+  );
+}
+
+// The neighbourhood (terrain, buildings, labels) and the camera are shared; each mode adds its own layers on top.
+export function Scene() {
+  const grid = useStore(s => s.grid), mode = useStore(s => s.mode);
+  const heatReady = useHeat(s => !!s.heat && !!s.baseline && s.siteId === grid?.site.id);
+  return (
+    <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, alpha: true }} camera={{ position: [240, 330, 470], fov: 42, near: 1, far: 5000 }}>
+      {mode === 'flood' ? <FloodLights /> : <HeatLights />}
       {grid && (
         <group key={grid.site.id}>
           <Terrain />
           <Buildings />
-          <Drains />
-          <Interventions />
-          <Water />
-          <Rain />
-          <Markers />
+          {mode === 'flood' && (
+            <>
+              <Drains />
+              <Interventions />
+              <Water />
+              <Rain />
+              <Markers />
+            </>
+          )}
+          {mode === 'heat' && heatReady && (
+            <>
+              <HeatOverlay />
+              <Trees />
+              <HeatInterventions />
+              <HeatMarkers />
+            </>
+          )}
         </group>
       )}
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI * 0.46} minDistance={40} maxDistance={1400} target={[0, 0, 30]} />

@@ -123,7 +123,7 @@ function skirtGeometry(g: Grid) {
 
 export function Terrain() {
   const grid = useStore(s => s.grid)!;
-  const overlay = useStore(s => s.overlay);
+  const overlay = useStore(s => (s.mode === 'flood' ? s.overlay : 'none'));
   const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
   const geo = useMemo(() => terrainGeometry(grid), [grid]);
   const tex = useMemo(() => baseMap(grid), [grid]);

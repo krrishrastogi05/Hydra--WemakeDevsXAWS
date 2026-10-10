@@ -46,6 +46,34 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 .btn.round { width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 50%; }
 .btn .dot { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px var(--warn); }
 
+/* ---------- modes: same layout, the accent follows the mode ---------- */
+.modes { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--edge); border-radius: 11px; }
+.modes button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font-weight: 700; }
+.modes button.m-flood.on { background: rgba(56, 189, 248, .16); color: #7dd3fc; box-shadow: inset 0 0 0 1px rgba(56, 189, 248, .45); }
+.modes button.m-heat.on { background: rgba(251, 146, 60, .16); color: #fdba74; box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .5); }
+.app[data-mode="heat"] { --accent: #fb923c; --accent-2: #f97316; }
+.app[data-mode="heat"] .cities button.on, .app[data-mode="heat"] .tabs button.on, .app[data-mode="heat"] .ab button.on { background: rgba(251, 146, 60, .14); box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .35); }
+.app[data-mode="heat"] .btn.primary { background: linear-gradient(180deg, #fdba74, #f97316); border-color: #fed7aa; color: #1c0d02; }
+.app[data-mode="heat"] .tabs .count { color: #1c0d02; }
+.sunstrip rect { fill: rgba(253, 186, 116, .35); }
+.sunstrip rect.past { fill: #fb923c; }
+.sunstrip rect.win { fill: rgba(251, 146, 60, .12); }
+.tag-heat { color: #fff7ed; border-color: rgba(251, 146, 60, .45); }
+.tag-heat.hot { background: rgba(124, 45, 18, .85); border-color: rgba(248, 113, 113, .7); font-weight: 600; }
+.tag-heat b { display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 3px; margin-right: 5px; border-radius: 8px; color: #1c0d02; font-size: 10px; }
+.hotspots.heat button { background: rgba(251, 146, 60, .05); }
+.hotspots.heat button::before { background: rgba(251, 146, 60, .22); color: #fdba74; }
+.hotspots.heat button:hover { border-color: #fb923c; }
+.modecards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modecard { display: grid; gap: 6px; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--edge-2); background: rgba(255,255,255,.03); color: var(--ink-2); }
+.modecard b { display: flex; align-items: center; gap: 7px; font-size: 15px; color: var(--ink); }
+.modecard.m-flood:hover { border-color: #38bdf8; background: rgba(56, 189, 248, .08); }
+.modecard.m-heat:hover { border-color: #fb923c; background: rgba(251, 146, 60, .08); }
+.modecard.m-flood b svg { color: #38bdf8; } .modecard.m-heat b svg { color: #fb923c; }
+.loader.soft { background: rgba(7, 12, 18, .35); pointer-events: none; }
+.loader .drop.sun { border-radius: 50%; transform: none; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .5; transform: scale(.85); } }
+
 /* ---------- tools ---------- */
 .toolbar { position: absolute; top: calc(var(--top) + 12px); left: 12px; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: var(--r); z-index: 20; }
 .toolbar button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 9px; background: none; color: var(--ink-2); --tc: var(--accent); }

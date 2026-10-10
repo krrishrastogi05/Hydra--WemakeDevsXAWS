@@ -81,6 +81,7 @@ export function Interventions() {
       return unit >= 0 ? { kind: 'desilt' as const, cells: grid.unitCells.get(unit) ?? [], ok: !validate(grid, { id: 'g', type: 'desilt', unit }, plan) } : null;
     }
     if (tool === 'drain') return { kind: 'cell' as const, cells: [hover.cell], ok: !validate(grid, { id: 'g', type: 'drain', cells: [hover.cell] }, plan) };
+    if (tool !== 'garden' && tool !== 'pit') return null;
     const cells = footprintFor(tool, grid, hover.cell);
     return { kind: tool, cells, ok: !validate(grid, { id: 'g', type: tool, cells }, plan) };
   }, [hover, tool, grid, plan]);

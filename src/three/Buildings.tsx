@@ -8,6 +8,7 @@ import type { Grid } from '../sim/grid';
 import { VE, half, hash } from './geo';
 import { useTools } from './useTools';
 import { DEPTH } from '../sim/flood/engine';
+import { useHeat } from '../heatStore';
 
 const PASTEL = ['#e9c9a3', '#e3d29b', '#b8d6c2', '#a9c4e2', '#ecb7b0', '#ede4cf', '#cdbfe2', '#f2d377', '#d9e3a8', '#f0c1d4', '#c9e0e8', '#f4d6b5'];
 const ROOF = new THREE.Color('#c9c3b6');
@@ -61,15 +62,17 @@ export function buildingOfFace(m: BuildingMesh, face: number) {
 
 export function Buildings() {
   const grid = useStore(s => s.grid)!;
+  const mode = useStore(s => s.mode);
   const overlay = useStore(s => s.overlay);
   const plan = useStore(s => s.plan);
+  const coolRoofs = useHeat(s => s.plan);
   const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
   const showRisk = useStore(s => s.peak || s.time > 0);
   const mesh = useMemo(() => buildBuildings(grid), [grid]);
   const { buildings } = useTools();
   const tankRef = useRef<THREE.InstancedMesh>(null), rwhRef = useRef<THREE.InstancedMesh>(null);
 
-  // wall colours: pastel, flood risk, or data provenance
+  // wall colours: pastel, flood risk (flood mode), cool roofs (heat mode), or data provenance
   useEffect(() => {
     const attr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute, arr = attr.array as Float32Array;
     arr.set(mesh.baseColor);
@@ -79,15 +82,18 @@ export function Buildings() {
       for (let v = mesh.starts[k]; v < mesh.starts[k + 1]; v++) if (nrm.getY(v) <= 0.5) c.toArray(arr, v * 3);
     };
     if (overlay === 'sources') grid.site.buildings.forEach((b, k) => paint(k, b.synthetic ? '#c084fc' : '#f8fafc'));
-    else if (result && showRisk) grid.site.buildings.forEach((b, k) => {
+    else if (mode === 'heat') {
+      const white = new THREE.Color('#f8fbff');
+      for (const p of coolRoofs) if (p.type === 'coolroof') for (let v = mesh.starts[p.building!]; v < mesh.starts[p.building! + 1]; v++) if (nrm.getY(v) > 0.5) white.toArray(arr, v * 3);
+    } else if (result && showRisk) grid.site.buildings.forEach((b, k) => {
       const d = result.doorstep[k];
       if (d > b.plinth) paint(k, FLOODED); else if (d > DEPTH.wet) paint(k, AT_RISK);
     });
     attr.needsUpdate = true;
-  }, [mesh, overlay, result, showRisk, grid]);
+  }, [mesh, overlay, result, showRisk, grid, mode, coolRoofs]);
 
   // rooftop water tanks (decorative: most Indian flat roofs carry one) and blue RWH tanks from the plan
-  const rwh = useMemo(() => new Set(plan.filter(p => p.type === 'rwh').map(p => p.building!)), [plan]);
+  const rwh = useMemo(() => new Set(mode === 'flood' ? plan.filter(p => p.type === 'rwh').map(p => p.building!) : []), [plan, mode]);
   const tankIds = useMemo(() => mesh.tops.map((t, k) => (t.y > -999 && grid.site.buildings[k].use === 'Residential' && hash(k * 3 + 1) < 0.55 ? k : -1)).filter(k => k >= 0), [mesh, grid]);
   useEffect(() => {
     const m = new THREE.Matrix4(), place = (inst: THREE.InstancedMesh | null, ids: number[], s: number) => {

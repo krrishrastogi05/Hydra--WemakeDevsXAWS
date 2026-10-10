@@ -9,6 +9,8 @@ import { DEPTH } from '../sim/flood/engine';
 import { CompareBars, LineSeries, ShareBars, type BarRow } from './charts';
 import { Icon } from './Chrome';
 import { cellX, cellZ, half } from '../three/geo';
+import { useHeat } from '../heatStore';
+import { HeatTab } from './heat/HeatPanel';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 const m3 = (v: number) => `${num(Math.round(v))} m³`;
@@ -252,17 +254,23 @@ function AboutTab() {
 
 const TABS: { id: PanelId; label: string }[] = [{ id: 'results', label: 'Results' }, { id: 'plan', label: 'Plan' }, { id: 'recommend', label: 'Recommend' }, { id: 'showdown', label: 'Showdown' }, { id: 'about', label: 'About' }];
 
+// The tabs are shared by both modes; the content comes from the active mode.
 export function SidePanel() {
-  const panel = useStore(s => s.panel), n = useStore(s => s.plan.length);
+  const panel = useStore(s => s.panel), mode = useStore(s => s.mode), nFlood = useStore(s => s.plan.length), nHeat = useHeat(s => s.plan.length);
+  const n = mode === 'flood' ? nFlood : nHeat;
   return (
     <aside className="panel">
       <nav className="tabs">{TABS.map(t => <button key={t.id} className={panel === t.id ? 'on' : ''} onClick={() => useStore.setState({ panel: t.id })}>{t.label}{t.id === 'plan' && n ? <span className="count">{n}</span> : null}</button>)}</nav>
       <div className="panel-body">
-        {panel === 'results' && <Results />}
-        {panel === 'plan' && <PlanTab />}
-        {panel === 'recommend' && <RecommendTab />}
-        {panel === 'showdown' && <ShowdownTab />}
-        {panel === 'about' && <AboutTab />}
+        {mode === 'heat' ? <HeatTab panel={panel} /> : (
+          <>
+            {panel === 'results' && <Results />}
+            {panel === 'plan' && <PlanTab />}
+            {panel === 'recommend' && <RecommendTab />}
+            {panel === 'showdown' && <ShowdownTab />}
+            {panel === 'about' && <AboutTab />}
+          </>
+        )}
       </div>
     </aside>
   );
