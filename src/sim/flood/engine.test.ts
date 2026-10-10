@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { loadGrid, STORMS } from './model';
+import { loadGrid } from '../grid';
+import { STORMS } from './model';
 import { simulate } from './engine';
-import type { SiteData } from './types';
+import type { SiteData } from '../types';
 
 const load = (id: string) => loadGrid(JSON.parse(fs.readFileSync(`public/data/${id}.json`, 'utf8')) as SiteData);
 const storm = STORMS.find(s => s.id === 'veryheavy')!;

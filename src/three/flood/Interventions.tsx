@@ -1,10 +1,11 @@
 // Placed interventions, placement previews (green = valid, red = not allowed) and the drain being drawn.
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { useStore, footprintFor } from '../store';
-import { validate, type Grid } from '../sim/model';
-import type { Intervention } from '../sim/types';
-import { cellX, cellY, cellZ } from './geo';
+import { useStore, footprintFor } from '../../store';
+import type { Grid } from '../../sim/grid';
+import { validate } from '../../sim/flood/model';
+import type { Intervention } from '../../sim/flood/types';
+import { cellX, cellY, cellZ } from '../geo';
 
 const box = new THREE.BoxGeometry(1, 1, 1);
 const SHRUB = new THREE.SphereGeometry(1, 8, 6);

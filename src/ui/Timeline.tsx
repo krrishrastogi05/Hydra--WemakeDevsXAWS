@@ -2,10 +2,11 @@
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey } from '../store';
-import { CATALOG, PARAMS, costOf, fmtINR, tankSize } from '../sim/model';
+import { fmtINR } from '../sim/grid';
+import { CATALOG, PARAMS, costOf, tankSize } from '../sim/flood/model';
 import { COVER_NAMES } from '../sim/types';
-import { placeName } from '../sim/optimizer';
-import { DEPTH } from '../sim/engine';
+import { placeName } from '../sim/flood/optimizer';
+import { DEPTH } from '../sim/flood/engine';
 import { Icon } from './Chrome';
 import { RainStrip } from './charts';
 

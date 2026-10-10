@@ -3,9 +3,11 @@
 // critical buildings) -> trace where every cell's runoff ends up (D8 + spill chains) -> score every candidate
 // (roof RWH, rain garden, recharge pit, relief drain, desilting) by harmful water removed per rupee ->
 // lazy-greedy picks within the round budget -> re-simulate and refine.
-import { COVER, type Intervention, type SimOptions, type SimResult } from './types';
+import { COVER } from '../types';
+import type { Grid } from '../grid';
+import type { Intervention, SimOptions, SimResult } from './types';
 import { DEPTH, buildSurface, harmWeights, planTerrain, simulate, Heap } from './engine';
-import { PARAMS, costOf, gardenFootprint, planCost, tankSize, usedCells, validate, type Grid } from './model';
+import { PARAMS, costOf, gardenFootprint, planCost, tankSize, usedCells, validate } from './model';
 
 let seq = 0;
 const uid = (p: string) => `${p}${Date.now().toString(36)}${(seq++).toString(36)}`;

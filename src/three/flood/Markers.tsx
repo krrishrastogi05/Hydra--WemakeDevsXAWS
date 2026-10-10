@@ -3,8 +3,8 @@ import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useStore } from '../store';
-import { VE, cellX, cellY, cellZ, half } from './geo';
+import { useStore } from '../../store';
+import { VE, cellX, cellY, cellZ, half } from '../geo';
 
 const RING = new THREE.RingGeometry(5, 6.4, 40).rotateX(-Math.PI / 2);
 const CELL_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));

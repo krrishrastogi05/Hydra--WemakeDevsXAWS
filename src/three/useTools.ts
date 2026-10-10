@@ -3,7 +3,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber';
 import { useRef } from 'react';
 import { useStore, footprintFor } from '../store';
 import { cellAt, lineCells } from './geo';
-import type { Intervention } from '../sim/types';
+import type { Intervention } from '../sim/flood/types';
 
 type Controls = { enabled: boolean } | null;
 

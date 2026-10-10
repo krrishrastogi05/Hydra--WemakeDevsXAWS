@@ -1,10 +1,11 @@
 // Promise wrapper around the engine workers. "sim" answers quick storm runs; "opt" does the heavy optimisation,
 // so the user can keep exploring while a recommendation is computed.
-import type { Intervention, Metrics, SimOptions, SimResult, SiteData } from './sim/types';
+import type { SiteData } from './sim/types';
+import type { Intervention, Metrics, SimOptions, SimResult } from './sim/flood/types';
 
 type Progress = (p: number, msg: string) => void;
 function makeWorker() {
-  const w = new Worker(new URL('./sim/worker.ts', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./sim/flood/worker.ts', import.meta.url), { type: 'module' });
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; onProgress?: Progress }>();
   let seq = 0;
   w.onmessage = e => {

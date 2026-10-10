@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { useStore } from '../store';
-import type { Grid } from '../sim/model';
+import type { Grid } from '../sim/grid';
 import { VE, half, hash } from './geo';
 import { useTools } from './useTools';
-import { DEPTH } from '../sim/engine';
+import { DEPTH } from '../sim/flood/engine';
 
 const PASTEL = ['#e9c9a3', '#e3d29b', '#b8d6c2', '#a9c4e2', '#ecb7b0', '#ede4cf', '#cdbfe2', '#f2d377', '#d9e3a8', '#f0c1d4', '#c9e0e8', '#f4d6b5'];
 const ROOF = new THREE.Color('#c9c3b6');

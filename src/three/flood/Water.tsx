@@ -3,10 +3,10 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useStore } from '../store';
-import type { SimResult } from '../sim/types';
-import { VE, cellX, cellY, cellZ } from './geo';
-import { terrainGeometry } from './Terrain';
+import { useStore } from '../../store';
+import type { SimResult } from '../../sim/flood/types';
+import { VE, cellX, cellY, cellZ } from '../geo';
+import { terrainGeometry } from '../Terrain';
 
 const displayed = () => { const s = useStore.getState(); return (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline; };
 

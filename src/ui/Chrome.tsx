@@ -2,8 +2,9 @@
 import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey, type Tool } from '../store';
-import { CATALOG, STORMS, fmtINR, planCost } from '../sim/model';
-import type { InterventionType } from '../sim/types';
+import { fmtINR } from '../sim/grid';
+import { CATALOG, STORMS, planCost } from '../sim/flood/model';
+import type { InterventionType } from '../sim/flood/types';
 
 export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const p: Record<string, ReactNode> = {

@@ -1,9 +1,11 @@
 /// <reference lib="webworker" />
 // Runs the engine off the main thread. Requests: load | simulate | optimize | showdown.
-import { loadGrid, planCost, type Grid } from './model';
+import { loadGrid, type Grid } from '../grid';
+import { planCost } from './model';
 import { simulate } from './engine';
 import { evenSpread, optimize } from './optimizer';
-import type { Intervention, SimOptions, SimResult, SiteData } from './types';
+import type { SiteData } from '../types';
+import type { Intervention, SimOptions, SimResult } from './types';
 
 let grid: Grid | null = null;
 const post = (msg: unknown, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(msg, transfer);

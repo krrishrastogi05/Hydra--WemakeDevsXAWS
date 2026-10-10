@@ -1,10 +1,11 @@
 // Right-hand panel: results, plan, recommendations, the budget showdown, and assumptions.
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey, type Panel as PanelId } from '../store';
-import { CATALOG, PARAMS, STORMS, costOf, fmtINR, planCost, type Grid } from '../sim/model';
-import type { Intervention, InterventionType, Metrics, SimResult } from '../sim/types';
-import { placeName } from '../sim/optimizer';
-import { DEPTH } from '../sim/engine';
+import { fmtINR, type Grid } from '../sim/grid';
+import { CATALOG, PARAMS, STORMS, costOf, planCost } from '../sim/flood/model';
+import type { Intervention, InterventionType, Metrics, SimResult } from '../sim/flood/types';
+import { placeName } from '../sim/flood/optimizer';
+import { DEPTH } from '../sim/flood/engine';
 import { CompareBars, LineSeries, ShareBars, type BarRow } from './charts';
 import { Icon } from './Chrome';
 import { cellX, cellZ, half } from '../three/geo';

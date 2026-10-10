@@ -6,9 +6,9 @@ import * as THREE from 'three';
 import { useStore } from '../store';
 import { Terrain } from './Terrain';
 import { Buildings } from './Buildings';
-import { Drains, Rain, Water } from './Water';
-import { Interventions } from './Interventions';
-import { Markers } from './Markers';
+import { Drains, Rain, Water } from './flood/Water';
+import { Interventions } from './flood/Interventions';
+import { Markers } from './flood/Markers';
 
 function CameraRig() {
   const controls = useThree(s => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;

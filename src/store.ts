@@ -1,8 +1,10 @@
 // App state (zustand). The UI never computes hydrology: every number comes from an engine result in here.
 import { create } from 'zustand';
 import { engine, type OptimizeResult, type ShowdownResult } from './simClient';
-import { CATALOG, STORMS, costOf, gardenFootprint, loadGrid, planCost, validate, type Grid } from './sim/model';
-import type { Antecedent, Intervention, InterventionType, SimOptions, SimResult, SiteData, SiteSummary } from './sim/types';
+import { loadGrid, type Grid } from './sim/grid';
+import { CATALOG, STORMS, costOf, gardenFootprint, planCost, validate } from './sim/flood/model';
+import type { SiteData, SiteSummary } from './sim/types';
+import type { Antecedent, Intervention, InterventionType, SimOptions, SimResult } from './sim/flood/types';
 
 export type Tool = 'inspect' | InterventionType | 'erase';
 export type Panel = 'results' | 'plan' | 'recommend' | 'showdown' | 'about';

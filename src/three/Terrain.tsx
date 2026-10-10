@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useStore } from '../store';
 import { COVER } from '../sim/types';
-import type { Grid } from '../sim/model';
+import type { Grid } from '../sim/grid';
 import { VE, half } from './geo';
 import { useTools } from './useTools';
 

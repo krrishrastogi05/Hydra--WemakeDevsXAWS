@@ -4,8 +4,10 @@
 //   -> open-drain inlets capture flow -> drains carry it to outfalls, surcharging back to the street when full
 //   -> low spots fill like small reservoirs (level from their hypsometric curve) and spill to the next one when full.
 // Moving water on streets gets a Manning normal depth from its discharge, so roads show running water too.
-import { COVER, type Hotspot, type Intervention, type Metrics, type SimOptions, type SimResult, type WaterBudget } from './types';
-import { BLOCK_MIN, PARAMS, hyetograph, planCost, tankSize, type Grid } from './model';
+import { COVER } from '../types';
+import type { Grid } from '../grid';
+import type { Hotspot, Intervention, Metrics, SimOptions, SimResult, WaterBudget } from './types';
+import { BLOCK_MIN, PARAMS, hyetograph, planCost, tankSize } from './model';
 
 export const DEPTH = { wet: 0.10, road: 0.15 };            // m: waterlogged; two-wheelers stall / traffic stops
 // by cover code: OPEN, ROAD, BUILDING, GREEN, WATER, PAVED, CHANNEL
