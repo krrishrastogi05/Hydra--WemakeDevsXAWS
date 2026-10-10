@@ -67,7 +67,7 @@ Resources:
       Events:
         Any:
           Type: HttpApi
-          Properties: { ApiId: !Ref Api, Path: /{proxy+}, Method: ANY }
+          Properties: { ApiId: !Ref Api, Path: '/{proxy+}', Method: ANY }
 
   # Long job: building an area (Overpass + terrain, up to a few minutes).
   WorkerFunction:
