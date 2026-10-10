@@ -29,23 +29,60 @@ function useShiftToPan(ref: React.RefObject<OrbitControlsImpl | null>) {
   }, [ref]);
 }
 
-/** Holding Space turns the pointer into a hand and pans the ground plane as the mouse simply moves — no click
- *  or drag needed, like a free-look pan tool. Movement is constrained to the horizontal plane (forward/back
- *  along the view direction, strafe left/right), not raw screen-space panning, so the ground stays level. */
-function useSpaceHoverPan(ref: React.RefObject<OrbitControlsImpl | null>) {
+const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+/** Holding Space turns the pointer into a hand and pans the ground plane: either by moving the mouse (no click
+ *  needed) or, while Space is held, with the arrow keys — whichever gesture reads as "move" to the viewer.
+ *  Movement is constrained to the horizontal plane (forward/back along the view direction, strafe left/right),
+ *  not raw screen-space panning, so the ground stays level. */
+function useSpacePan(ref: React.RefObject<OrbitControlsImpl | null>) {
   useEffect(() => {
-    let space = false, last: { x: number; y: number } | null = null;
-    const typing = () => { const t = document.activeElement; return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+    let space = false, last: { x: number; y: number } | null = null, raf = 0;
+    const held = new Set<string>();
+    const typing = () => { const t = document.activeElement; return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); };
     const setCursor = () => { document.body.style.cursor = space ? 'grab' : ''; };
+
+    const panBy = (worldDx: number, worldDz_forward: number) => {
+      const c = ref.current;
+      if (!c) return;
+      const cam = c.object as THREE.PerspectiveCamera;
+      const dir = new THREE.Vector3(); cam.getWorldDirection(dir); dir.y = 0; dir.normalize();
+      const right = dir.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+      const delta = new THREE.Vector3().addScaledVector(right, worldDx).addScaledVector(dir, worldDz_forward);
+      c.target.add(delta);
+      cam.position.add(delta);
+      c.update();
+    };
+
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      if (!space || !held.size) return;
+      const c = ref.current;
+      if (!c) return;
+      const cam = c.object as THREE.PerspectiveCamera;
+      const speed = cam.position.distanceTo(c.target) * 0.9;   // world units/sec, scales with zoom so it always feels the same
+      const dt = 1 / 60;
+      let dx = 0, dz = 0;
+      if (held.has('ArrowLeft')) dx -= 1;
+      if (held.has('ArrowRight')) dx += 1;
+      if (held.has('ArrowUp')) dz += 1;
+      if (held.has('ArrowDown')) dz -= 1;
+      if (dx || dz) panBy(dx * speed * dt, dz * speed * dt);
+    };
+
     const down = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || space || typing()) return;
-      e.preventDefault(); space = true; last = null; setCursor();
-      const c = ref.current; if (c) c.enableRotate = false;
+      if (e.code === 'Space' && !space && !typing()) {
+        e.preventDefault(); space = true; last = null; setCursor();
+        const c = ref.current; if (c) c.enableRotate = false;
+      }
+      if (space && ARROWS.has(e.code)) { e.preventDefault(); held.add(e.code); }
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return;
-      space = false; last = null; setCursor();
-      const c = ref.current; if (c) c.enableRotate = true;
+      if (e.code === 'Space') {
+        space = false; last = null; held.clear(); setCursor();
+        const c = ref.current; if (c) c.enableRotate = true;
+      }
+      if (ARROWS.has(e.code)) held.delete(e.code);
     };
     const move = (e: PointerEvent) => {
       const c = ref.current;
@@ -57,19 +94,17 @@ function useSpaceHoverPan(ref: React.RefObject<OrbitControlsImpl | null>) {
       const cam = c.object as THREE.PerspectiveCamera;
       const dist = cam.position.distanceTo(c.target);
       const scale = (2 * Math.tan((cam.fov * Math.PI) / 360) * dist) / window.innerHeight;
-      const dir = new THREE.Vector3(); cam.getWorldDirection(dir); dir.y = 0; dir.normalize();
-      const right = dir.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-      const delta = new THREE.Vector3().addScaledVector(right, -dx * scale).addScaledVector(dir, dy * scale);
-      c.target.add(delta);
-      cam.position.add(delta);
-      c.update();
+      panBy(-dx * scale, dy * scale);
     };
-    const blur = () => { space = false; last = null; setCursor(); const c = ref.current; if (c) c.enableRotate = true; };
+    const blur = () => { space = false; last = null; held.clear(); setCursor(); const c = ref.current; if (c) c.enableRotate = true; };
+
+    raf = requestAnimationFrame(tick);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('pointermove', move);
     window.addEventListener('blur', blur);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('pointermove', move);
@@ -160,7 +195,7 @@ export function Scene() {
   const declined = useRef(false);
   const orbitRef = useRef<OrbitControlsImpl>(null);
   useShiftToPan(orbitRef);
-  useSpaceHoverPan(orbitRef);
+  useSpacePan(orbitRef);
   const onDecline = () => {
     const st = useStore.getState();
     if (declined.current || st.quality === 'low' || st.qualityChosen) return;
