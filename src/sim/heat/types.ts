@@ -55,4 +55,5 @@ export interface HeatResult {
   hotspots: HeatHotspot[];
   metrics: HeatMetrics;
   cost: number; runtimeMs: number;
+  source?: 'server' | 'browser';       // where it was calculated (set by src/simClient.ts, not the engine)
 }

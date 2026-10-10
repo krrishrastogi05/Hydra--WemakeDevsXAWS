@@ -20,7 +20,7 @@
     "dev": "tsx watch src/local.ts",
     "start": "tsx src/local.ts",
     "build": "node build.mjs",
-    "test": "tsx --test test/api.test.ts",
+    "test": "tsx --test test/api.test.ts test/calc.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   }
 }

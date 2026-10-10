@@ -80,7 +80,7 @@ The whole engine runs in the browser, so hosting is a static site. An optional b
 |---|---|---|
 | Terrain Tiles on the AWS Registry of Open Data (`elevation-tiles-prod`) | **Done** | Elevation for every city |
 | AWS Amplify Hosting | **Live**: https://main.d3dmcevnvvv968.amplifyapp.com, redeployed by GitHub Actions on every push to `main` | Public demo URL |
-| AWS Lambda + API Gateway (HTTP API) | **Live** (SAM stack `hydra-api`, `ap-south-1`) | API, plus a worker Lambda for area builds |
+| AWS Lambda + API Gateway (HTTP API) | **Live** (SAM stack `hydra-api`, `ap-south-1`) | Runs every storm, sun trace, recommendation and showdown (the browser engine is the fallback); a worker Lambda builds new areas |
 | Amazon DynamoDB | **Live** | Saved and shared plans (`?plan=<id>` links), area build status |
 | Amazon S3 | **Live** | Neighbourhoods built on demand ("+ Area": any spot in India from OSM + AWS terrain) |
 | Amazon S3 + CloudFront | Alternative to Amplify | Same static hosting |

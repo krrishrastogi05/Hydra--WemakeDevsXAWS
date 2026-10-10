@@ -4,16 +4,17 @@
 //   POST /plans             -> 201 { id }                                             GET /plans/{id}
 //   POST /areas             -> 202 area status                                        GET /areas/{id}
 //   GET  /areas/{id}/data   GET /areas/{id}/heat   (the built area, once ready)
+//   POST /calc/{flood|heat}/{simulate|optimize|showdown}   (calc.ts: the engine, run on the server)
 import { createHash, randomBytes } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { validateAreaRequest, type AreaMeta, type AreaRequest } from '../../src/shared/area';
+import type { CalcMode, CalcOp } from '../../src/shared/calc';
 import { validateNewPlan, type NewPlan, type SavedPlan } from '../../src/shared/plan';
+import { calc } from './calc';
 import type { Config } from './config';
+import { HttpError, cors, json, type Req, type Res } from './http';
 import { areaFile, areaKey, dispatch } from './jobs';
 import type { Store } from './store';
-
-export interface Req { method: string; path: string; body: string | null; acceptGzip?: boolean }
-export interface Res { status: number; headers: Record<string, string>; body: string | Buffer }
 
 const MAX_BODY = 400_000;
 const STALE_MS = 10 * 60_000;   // a job not updated for this long is assumed lost and may be restarted
@@ -22,14 +23,6 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const newId = () => { const a = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = randomBytes(10); return Array.from(b, x => a[x % a.length]).join(''); };
 const stale = (t: string) => Date.now() - Date.parse(t) > STALE_MS;
 
-class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
-
-function json(cfg: Config, status: number, body: unknown, extra: Record<string, string> = {}): Res {
-  return { status, headers: { ...cors(cfg), 'content-type': 'application/json', 'cache-control': 'no-store', ...extra }, body: JSON.stringify(body) };
-}
-export const cors = (cfg: Config) => ({
-  'access-control-allow-origin': cfg.allowOrigin, 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400',
-});
 function parse(body: string | null): unknown {
   if (!body) throw new HttpError(400, 'Expected a JSON body');
   if (body.length > MAX_BODY) throw new HttpError(413, 'Request body is too large');
@@ -49,6 +42,9 @@ export async function handle(cfg: Config, store: Store, req: Req): Promise<Res> 
       case 'POST /areas': return await createArea(cfg, store, parse(req.body));
       case 'GET /areas/:id': return await getRecord(cfg, store, areaKey(id), (a: AreaMeta) => a);
       case 'GET /areas/:id/data': case 'GET /areas/:id/heat': return await areaData(cfg, store, id, sub as 'data' | 'heat', !!req.acceptGzip);
+      case 'POST /calc/:id/simulate': case 'POST /calc/:id/optimize': case 'POST /calc/:id/showdown':
+        if (id !== 'flood' && id !== 'heat') throw new HttpError(404, 'Not found');
+        return await calc(cfg, store, id as CalcMode, sub as CalcOp, parse(req.body), !!req.acceptGzip);
       default: throw new HttpError(404, 'Not found');
     }
   } catch (e) {

@@ -97,8 +97,8 @@ src/store.ts             shared state + flood state;  src/heatStore.ts  heat sta
 src/three/               shared scene (terrain, buildings, camera); flood/ (water, rain, drains); heat/ (sun, shade map, trees)
 src/ui/                  shared shell (top bar, tools, tabs); flood panels; heat/ panels, timeline, inspector
 src/brief.ts             officer brief (English + Hindi) written in the browser; briefInput.ts gathers the numbers
-src/shared/              contracts shared with the backend: saved plans, area requests
-src/api.ts               client for the optional backend; sharedPlan.ts uses it
+src/shared/              contracts shared with the backend: calculation requests, the result wire format, saved plans, area requests
+src/api.ts               client for the optional backend; simClient.ts runs the engine through it, sharedPlan.ts saves plans
 backend/                 optional API (Lambda + API Gateway + DynamoDB + S3), see backend/README.md
 ```
 
@@ -106,14 +106,15 @@ Rule: `src/sim/heat` never imports from `src/sim/flood` and vice versa; both use
 
 ### The backend (optional)
 
-The simulator never needs a server: every storm, sun trace and recommendation still runs in the browser. So does the **officer brief**: in the Plan tab, *Officer brief* turns the plan and its before/after numbers into a one-page note for a ward officer, in English and Hindi, to copy or print.
+The simulator never needs a server, but with the backend running, the backend does the calculating:
 
-The backend adds the two things a browser cannot do on its own:
-
+- **Calculations on AWS.** Every storm, sun trace, recommendation and budget showdown runs on the API (AWS Lambda when deployed), with the same engine code as the browser. The browser sends the neighbourhood, the storm or day, and the plan; the server checks each intervention with the map's placement rules, recomputes costs and returns the result, which the browser only draws. Each result panel says where it was calculated. If the API is missing or does not answer, the same engine runs in the browser and the panel says so; the numbers are identical (a test checks this).
 - **Share links.** *Copy share link* saves the plan with its neighbourhood, storm or day, and budget, and gives a link (`/?plan=<id>`) that reopens exactly that plan.
 - **Add your own area.** *+ Area* in the top bar opens a map of India. Pick a built-up spot (or search for it), give it a name and a soil type, and the backend builds a new 600 m × 600 m neighbourhood from OpenStreetMap and AWS Terrain Tiles with the same builder as the demo cities. It takes about a minute, then the area works in both modes.
 
-An area build outlasts an API Gateway request, so the API stores a job, a worker Lambda runs it, and the app polls for the result. Locally the same API runs as a small Node server with files on disk.
+The **officer brief** needs no backend: in the Plan tab, *Officer brief* turns the plan and its before/after numbers into a one-page note for a ward officer, in English and Hindi, to copy or print.
+
+A storm's result, animation included, comes back as one gzipped binary response (under 1 MB even for a 6-hour storm). An area build outlasts an API Gateway request, so the API stores a job, a worker Lambda runs it, and the app polls for the result. Locally the same API runs as a small Node server with files on disk.
 
 **Engine** (transparent and simplified, documented in the app's *About* tab). Each minute:
 1. **Rain** falls as an IMD-category design storm.

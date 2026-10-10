@@ -1,8 +1,11 @@
-// Client for the HYDRA API (backend/): saved plans and new areas. The simulator itself never needs it;
-// without an API (no VITE_API_URL in a production build) the app stays a static site and these features step aside.
+// Client for the HYDRA API (backend/): calculations on AWS, saved plans and new areas. The simulator never depends on
+// it: without an API (no VITE_API_URL in a production build), or when a call fails, the engine runs in the browser and
+// the app stays a static site; share links and new areas step aside.
 import { create } from 'zustand';
 import { isCustomSite, type AreaMeta, type AreaRequest } from './shared/area';
+import type { CalcMode, CalcOp, FloodCalc, HeatCalc } from './shared/calc';
 import type { NewPlan, SavedPlan } from './shared/plan';
+import { unpack } from './shared/wire';
 import type { SiteSummary } from './sim/types';
 
 export const API_URL = String(import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '')).replace(/\/+$/, '');
@@ -35,6 +38,17 @@ async function poll<T>(get: () => Promise<T>, done: (t: T) => boolean, everyMs: 
     await sleep(everyMs);
   }
 }
+
+/** Runs the engine on the API (backend /calc routes). A storm or day comes back in the binary format of shared/wire.ts. */
+export async function calcOnServer<T>(mode: CalcMode, op: CalcOp, body: FloodCalc | HeatCalc): Promise<T> {
+  const r = await fetch(`${API_URL}/calc/${mode}/${op}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(40_000),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HYDRA API error ${r.status}`);
+  return op === 'simulate' ? unpack<T>(await r.arrayBuffer()) : await r.json() as T;
+}
+/** The AWS region the API runs in, read from its execute-api URL (empty for a local API). */
+export const apiRegion = /\.execute-api\.([a-z0-9-]+)\./.exec(API_URL)?.[1] ?? '';
 
 export const api = {
   savePlan: (p: NewPlan) => call<{ id: string }>('POST', '/plans', p),

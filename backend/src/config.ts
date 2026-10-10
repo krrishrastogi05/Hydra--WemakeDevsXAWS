@@ -11,6 +11,8 @@ export function config() {
     bucket: env.BUCKET_NAME ?? '',                             // aws storage: S3 bucket for built areas
     workerFunction: env.WORKER_FUNCTION ?? '',                 // aws: Lambda that builds new areas
     allowOrigin: env.ALLOW_ORIGIN || '*',
+    // the demo cities' data: copied next to the Lambda's code by build.mjs, read from the app's public/data locally
+    siteDir: path.resolve(env.SITE_DATA_DIR ?? (env.LAMBDA_TASK_ROOT ? path.join(env.LAMBDA_TASK_ROOT, 'data') : '../public/data')),
   };
 }
 export type Config = ReturnType<typeof config>;

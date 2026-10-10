@@ -2,9 +2,10 @@
 import { create } from 'zustand';
 import { API_URL, api, checkBackend, rememberArea, savedAreas, siteDataUrl, useBackend } from './api';
 import { isCustomSite } from './shared/area';
+import { floodRunOptions } from './shared/calc';
 import { engine, type OptimizeResult, type ShowdownResult } from './simClient';
 import { loadGrid, type Grid } from './sim/grid';
-import { CATALOG, STORMS, costOf, gardenFootprint, planCost, validate } from './sim/flood/model';
+import { CATALOG, costOf, gardenFootprint, planCost, validate } from './sim/flood/model';
 import type { SiteData, SiteSummary } from './sim/types';
 import type { Antecedent, Intervention, InterventionType, SimOptions, SimResult } from './sim/flood/types';
 import type { HeatInterventionType } from './sim/heat/types';
@@ -45,8 +46,7 @@ interface State {
 }
 
 export const planKey = (plan: Intervention[]) => plan.map(p => p.id).join('|');
-export const simOptions = (s: Pick<State, 'stormId' | 'antecedent'>, keepFrames = true): SimOptions =>
-  ({ storm: STORMS.find(x => x.id === s.stormId) ?? STORMS[0], antecedent: s.antecedent, keepFrames, recessionMin: 60, frameEveryMin: 2 });
+export const simOptions = (s: Pick<State, 'stormId' | 'antecedent'>, keepFrames = true): SimOptions => floodRunOptions(s.stormId, s.antecedent, keepFrames);
 let ivSeq = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 

@@ -3,8 +3,9 @@
 import { create } from 'zustand';
 import { useStore } from './store';
 import { siteDataUrl } from './api';
+import { heatRunOptions } from './shared/calc';
 import { heatEngine, type HeatOptimizeResult, type HeatShowdownResult } from './simClient';
-import { HEAT_CATALOG, HEAT_SCENARIOS, HEAT_WINDOWS, heatCostOf, heatPlanCost, validateHeat } from './sim/heat/model';
+import { HEAT_CATALOG, HEAT_WINDOWS, heatCostOf, heatPlanCost, validateHeat } from './sim/heat/model';
 import { fmtINR } from './sim/grid';
 import type { HeatIntervention, HeatOptions, HeatResult, HeatSite } from './sim/heat/types';
 
@@ -28,10 +29,7 @@ interface HeatState {
 }
 
 export const heatPlanKey = (plan: HeatIntervention[]) => plan.map(p => p.id).join('|');
-export const heatOptions = (s: Pick<HeatState, 'scenarioId' | 'windowId'>, keepFrames = true): HeatOptions => ({
-  scenario: HEAT_SCENARIOS.find(x => x.id === s.scenarioId) ?? HEAT_SCENARIOS[0],
-  window: HEAT_WINDOWS.find(x => x.id === s.windowId) ?? HEAT_WINDOWS[0], keepFrames,
-});
+export const heatOptions = (s: Pick<HeatState, 'scenarioId' | 'windowId'>, keepFrames = true): HeatOptions => heatRunOptions(s.scenarioId, s.windowId, keepFrames);
 let ivSeq = 0, demoDone = false;
 const fresh = { plan: [], undoStack: [], baseline: null, current: null, currentKey: '', running: false, view: 'baseline' as const, summary: true, playing: false, recommendation: null, showdown: null, busy: null };
 
