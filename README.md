@@ -151,12 +151,13 @@ npm run data:heat    # optional: rebuild the heat-mode trees and places (cached 
 
 ## Deploy on AWS
 
-HYDRA is a static site; the engine runs in the browser.
+HYDRA is a static site; the engine runs in the browser. A planned AWS Lambda calculation backend (custom rainfall, a worked calculation for every intervention) is designed in [BACKEND.md](BACKEND.md).
 - **AWS Amplify Hosting:** connect the repo; `amplify.yml` builds `dist/`.
 - **S3 + CloudFront:** `npm run build`, upload `dist/` to a bucket, and serve it through CloudFront with the default root object `index.html`.
 
 ## Roadmap
 
+- Calculation backend on AWS Lambda + API Gateway with custom rainfall and per-intervention calculations: see [BACKEND.md](BACKEND.md).
 - Heat mode: satellite land-surface temperature to calibrate the surface term; a tree census where one exists.
 - An Amazon Bedrock "ward officer brief" that summarises the chosen plan in English and Hindi.
 - Upload your own ward boundary.

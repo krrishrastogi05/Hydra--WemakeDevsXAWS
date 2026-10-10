@@ -80,6 +80,7 @@ The whole engine runs in the browser, so hosting is a static site.
 |---|---|---|
 | Terrain Tiles on the AWS Registry of Open Data (`elevation-tiles-prod`) | **Done** | Elevation for every city |
 | AWS Amplify Hosting | **Ready** (`amplify.yml` in repo), not yet deployed | Public demo URL |
+| AWS Lambda + API Gateway + S3 calculation backend | Designed ([BACKEND.md](BACKEND.md)) | Runs every calculation on the server: custom rainfall, a worked calculation per intervention, browser fallback |
 | Amazon Bedrock "ward officer brief" | Not started | Turn the chosen plan into a one-page summary in English and Hindi |
 | Amazon S3 + CloudFront | Alternative to Amplify | Same static hosting |
 
