@@ -162,6 +162,18 @@ function FloodLegend() {
         <label><input type="checkbox" checked={s.showLabels} onChange={e => s.set({ showLabels: e.target.checked })} />Labels</label>
         <label><input type="checkbox" checked={s.showDrains} onChange={e => s.set({ showDrains: e.target.checked })} />Drains</label>
       </div>
+      <GraphicsToggle />
+    </div>
+  );
+}
+
+/** High = ambient occlusion, anti-aliasing, outlines, sharper ground; Low = lighter for older laptops. */
+export function GraphicsToggle() {
+  const quality = useStore(s => s.quality), setQuality = useStore(s => s.setQuality);
+  return (
+    <div className="gfx" role="group" aria-label="Graphics quality">
+      <span>Graphics</span>
+      {(['high', 'low'] as const).map(q => <button key={q} className={quality === q ? 'on' : ''} onClick={() => setQuality(q)}>{q === 'high' ? 'High' : 'Low'}</button>)}
     </div>
   );
 }

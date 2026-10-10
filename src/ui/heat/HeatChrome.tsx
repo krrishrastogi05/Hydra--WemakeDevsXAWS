@@ -6,7 +6,7 @@ import { fmtINR } from '../../sim/grid';
 import { HEAT_CATALOG, HEAT_PARAMS, HEAT_SCENARIOS, HEAT_WINDOWS, heatPlanCost } from '../../sim/heat/model';
 import type { HeatInterventionType } from '../../sim/heat/types';
 import { exposureColor } from '../../three/heat/HeatLayer';
-import { Icon } from '../Chrome';
+import { GraphicsToggle, Icon } from '../Chrome';
 
 export const HEAT_BUDGETS = [5e5, 10e5, 25e5, 50e5, 1e7];
 
@@ -71,6 +71,7 @@ export function HeatLegend() {
         <label><input type="checkbox" checked={s.overlay === 'sources'} onChange={e => s.set({ overlay: e.target.checked ? 'sources' : 'none' })} />Data sources <em>violet = synthetic</em></label>
         <label><input type="checkbox" checked={s.showLabels} onChange={e => s.set({ showLabels: e.target.checked })} />Labels</label>
       </div>
+      <GraphicsToggle />
     </div>
   );
 }

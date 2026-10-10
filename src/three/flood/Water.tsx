@@ -18,6 +18,14 @@ function frameAt(res: SimResult, t: number) {
   return { k: Math.max(0, k), a: res.nFrames > 1 ? f - Math.max(0, k) : 0 };
 }
 
+/** Rain falling at the playback time, mm/h (0 at the peak view or before play). Shared by the rain and the storm light. */
+export function rainRate() {
+  const s = useStore.getState(), res = displayed();
+  if (!res || s.peak || s.time <= 0) return 0;
+  const { k, a } = frameAt(res, s.time);
+  return res.rainSeries[k] * (1 - a) + res.rainSeries[Math.min(res.nFrames - 1, k + 1)] * a;
+}
+
 const waterVert = /* glsl */`
   attribute float depth; attribute float ground; uniform float uVE; varying float vDepth; varying vec3 vWorld;
   void main() {
@@ -103,9 +111,7 @@ export function Rain() {
   }, []);
   const mat = useMemo(() => new THREE.ShaderMaterial({ vertexShader: rainVert, fragmentShader: rainFrag, transparent: true, depthWrite: false, uniforms: { uTime: { value: 0 }, uIntensity: { value: 0 }, uSize: { value: grid.nx * grid.dx * 1.25 } } }), [grid]);
   useFrame(state => {
-    const s = useStore.getState(), res = displayed();
-    let mmh = 0;
-    if (res && !s.peak && s.time > 0) { const { k, a } = frameAt(res, s.time); mmh = res.rainSeries[k] * (1 - a) + res.rainSeries[Math.min(res.nFrames - 1, k + 1)] * a; }
+    const mmh = rainRate();
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uIntensity.value += (Math.min(1, mmh / 70) - mat.uniforms.uIntensity.value) * 0.08;
   });

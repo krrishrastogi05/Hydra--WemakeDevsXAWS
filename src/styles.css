@@ -207,6 +207,10 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .toggles input { accent-color: var(--accent); }
 .toggles em { color: var(--ink-3); font-style: normal; font-size: 10.5px; }
+.gfx { display: flex; align-items: center; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }
+.gfx span { color: var(--ink-3); margin-right: auto; }
+.gfx button { background: transparent; border: 1px solid var(--edge); color: var(--ink-2); border-radius: 6px; padding: 2px 9px; font: inherit; font-size: 11px; cursor: pointer; }
+.gfx button.on { border-color: var(--accent); color: var(--ink); background: rgba(56, 189, 248, 0.12); }
 
 /* ---------- map labels (HTML in 3D) ---------- */
 .tag { padding: 2px 7px; border-radius: 7px; font-size: 11px; white-space: nowrap; background: rgba(11, 18, 26, .78); border: 1px solid var(--edge); color: var(--ink-2); user-select: none; }
