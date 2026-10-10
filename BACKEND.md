@@ -2,7 +2,7 @@
 
 This page covers HYDRA's calculation backend: what it computes, how each intervention's numbers are worked out, the API, and how to deploy it. For the project overview see `README.md`; for status and priorities see `DIRECTION.md`.
 
-**Status: planned.** Nothing on this page is built yet. Section 10 gives the build order.
+**Status: partly built.** The API runs every storm, day, recommendation and showdown on AWS Lambda with the browser as fallback, and the app shows where each result was calculated (sections 2, 3 and 8, with routes under `/calc/`, see `backend/README.md`). Results come back inline, gzipped, under 1 MB, so the frames bucket is not needed. Not built yet: custom rainfall (section 4), per-intervention calculations (section 5) and the with/without attribution (section 6). Section 10 gives the build order.
 
 ---
 
