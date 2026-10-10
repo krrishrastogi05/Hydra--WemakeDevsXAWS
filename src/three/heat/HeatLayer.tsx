@@ -59,7 +59,7 @@ function overlayTexture(g: Grid, r: HeatResult, summary: boolean, hour: number) 
     if (summary) {
       if (r.weight[i] <= 0) continue;
       const [cr, cg, cb] = exposureColor(r.exposure[i]);
-      img.data.set([cr, cg, cb, 150 + Math.round(70 * Math.min(1, r.weight[i] / 1.5))], i * 4);
+      img.data.set([cr, cg, cb, 95 + Math.round(95 * Math.min(1, r.weight[i] / 1.5))], i * 4);
     } else if (r.frames) {
       const t = r.frames[k * g.n + i] / 255;   // 1 = full sun
       img.data.set(t > 0.5 ? [255, 196, 92, Math.round(70 + 90 * t)] : [30, 64, 120, Math.round(120 * (1 - t))], i * 4);

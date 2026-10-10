@@ -76,7 +76,7 @@ export const useStore = create<State>((set, get) => ({
       set({ sites });
       await get().loadSite(sites.some(s => s.id === fromHash) ? fromHash : 'gurugram');
       // demo links: ?demo=showdown runs the budget showdown, ?demo=plan applies HYDRA's recommendation and plays the storm
-      const demo = new URLSearchParams(location.search).get('demo');
+      const demo = get().mode === 'flood' ? new URLSearchParams(location.search).get('demo') : null;   // heat demos: heatStore.ts
       if (demo === 'showdown') get().runShowdown();
       else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); set({ panel: 'results' }); } }
     } catch (e) { set({ error: `Could not load site data: ${(e as Error).message}`, loading: null }); }

@@ -31,7 +31,7 @@ export const heatOptions = (s: Pick<HeatState, 'scenarioId' | 'windowId'>, keepF
   scenario: HEAT_SCENARIOS.find(x => x.id === s.scenarioId) ?? HEAT_SCENARIOS[0],
   window: HEAT_WINDOWS.find(x => x.id === s.windowId) ?? HEAT_WINDOWS[0], keepFrames,
 });
-let ivSeq = 0;
+let ivSeq = 0, demoDone = false;
 const fresh = { plan: [], undoStack: [], baseline: null, current: null, currentKey: '', running: false, view: 'baseline' as const, summary: true, playing: false, recommendation: null, showdown: null, busy: null };
 
 export const useHeat = create<HeatState>((set, get) => ({
@@ -52,6 +52,13 @@ export const useHeat = create<HeatState>((set, get) => ({
       await get().runBaseline();
     } catch (e) { useStore.getState().notify(`Could not load heat data: ${(e as Error).message}`, 'error'); }
     set({ loading: false });
+    // demo links (?demo=showdown | ?demo=plan with #city/heat), once per page load
+    const demo = new URLSearchParams(location.search).get('demo');
+    if (demo && !demoDone && get().baseline) {
+      demoDone = true;
+      if (demo === 'showdown') get().runShowdown();
+      else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); useStore.setState({ panel: 'results' }); } }
+    }
   },
 
   setScenario: scenarioId => { set({ scenarioId, recommendation: null, showdown: null }); get().runBaseline().then(() => { if (get().plan.length) get().runPlan(false); }); },
