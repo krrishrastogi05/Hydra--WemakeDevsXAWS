@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  HYDRA API: saved and shared plans (DynamoDB) and new neighbourhoods built on demand from
+  OpenStreetMap + AWS Terrain Tiles (Lambda + S3). Build first (npm run build in backend/), then: sam deploy --guided
+
+Parameters:
+  AllowOrigin:
+    Type: String
+    Default: '*'
+    Description: Origin allowed to call the API, e.g. https://main.d123.amplifyapp.com (* while testing)
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    Handler: index.handler
+    Environment:
+      Variables:
+        STORAGE: aws
+        TABLE_NAME: !Ref Table
+        BUCKET_NAME: !Ref AreasBucket
+        NODE_OPTIONS: --enable-source-maps
+
+Resources:
+  # Plans (plan#id) and area build status (area#id).
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+
+  # Built neighbourhoods (areas/<id>.json and areas/<id>.heat.json), served through the API.
+  AreasBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      BucketEncryption: { ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }] }
+
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowOrigin]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
+        MaxAge: 86400
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/api
+      MemorySize: 512
+      Timeout: 20
+      Environment:
+        Variables:
+          WORKER_FUNCTION: !Ref WorkerFunction
+          ALLOW_ORIGIN: !Ref AllowOrigin
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref Table }
+        - S3ReadPolicy: { BucketName: !Ref AreasBucket }
+        - LambdaInvokePolicy: { FunctionName: !Ref WorkerFunction }
+      Events:
+        Any:
+          Type: HttpApi
+          Properties: { ApiId: !Ref Api, Path: /{proxy+}, Method: ANY }
+
+  # Long job: building an area (Overpass + terrain, up to a few minutes).
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/worker
+      MemorySize: 1536
+      Timeout: 600
+      EventInvokeConfig: { MaximumRetryAttempts: 0 }
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref Table }
+        - S3CrudPolicy: { BucketName: !Ref AreasBucket }
+
+Outputs:
+  ApiUrl:
+    Description: Set this as VITE_API_URL when building the app (Amplify environment variable)
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com
