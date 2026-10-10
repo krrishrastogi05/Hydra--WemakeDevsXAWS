@@ -1,0 +1,60 @@
+# Builds the app on every push to main and uploads it to the Amplify Hosting app (a manual-deploy app, so the
+# repo needs no Amplify GitHub connection). AWS access is the hydra-github-deploy role through GitHub's OIDC
+# login; it can only upload to this app's main branch, so no AWS keys are stored in the repo.
+name: Deploy to Amplify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: amplify-deploy
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-south-1
+  AMPLIFY_APP_ID: d3dmcevnvvv968
+  AMPLIFY_BRANCH: main
+  VITE_API_URL: https://vnomcfk5el.execute-api.ap-south-1.amazonaws.com   # ApiUrl output of the hydra-api stack
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::465861110847:role/hydra-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload to Amplify
+        run: |
+          (cd dist && zip -qr ../site.zip .)
+          read -r JOB URL < <(aws amplify create-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --query '[jobId,zipUploadUrl]' --output text)
+          curl -sSf -T site.zip "$URL"
+          aws amplify start-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$JOB" > /dev/null
+          for _ in $(seq 60); do
+            STATUS=$(aws amplify get-job --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$JOB" --query job.summary.status --output text)
+            echo "Amplify job $JOB: $STATUS"
+            case "$STATUS" in
+              SUCCEED) echo "Live at https://$AMPLIFY_BRANCH.$AMPLIFY_APP_ID.amplifyapp.com"; exit 0 ;;
+              FAILED|CANCELLED) exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "Timed out waiting for Amplify"; exit 1

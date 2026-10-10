@@ -1,0 +1,11 @@
+# Settings of the live stack, so `sam deploy` (after `npm run build`) updates it with no prompts.
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "hydra-api"
+region = "ap-south-1"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "AllowOrigin=\"https://main.d3dmcevnvvv968.amplifyapp.com\""
+confirm_changeset = false
+fail_on_empty_changeset = false
