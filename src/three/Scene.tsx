@@ -47,8 +47,8 @@ function Sky({ horizon, zenith, ground, skyRef }: { horizon: string; zenith: str
   return <mesh material={mat} renderOrder={-1} frustumCulled={false}><sphereGeometry args={[3200, 32, 16]} /></mesh>;
 }
 
-const CALM = { sun: 1.9, hemi: 0.55, fogNear: 1000, fogFar: 2600, horizon: new THREE.Color('#3a4c5f'), zenith: new THREE.Color('#0e1824'), fog: new THREE.Color('#2a3846') };
-const STORM = { sun: 0.75, hemi: 0.4, fogNear: 520, fogFar: 1700, horizon: new THREE.Color('#2a3138'), zenith: new THREE.Color('#0b0f14'), fog: new THREE.Color('#222a32') };
+const CALM = { sun: 2.1, hemi: 0.8, fogNear: 1000, fogFar: 2600, horizon: new THREE.Color('#3a4c5f'), zenith: new THREE.Color('#0e1824'), fog: new THREE.Color('#2a3846') };
+const STORM = { sun: 0.8, hemi: 0.55, fogNear: 520, fogFar: 1700, horizon: new THREE.Color('#2a3138'), zenith: new THREE.Color('#0b0f14'), fog: new THREE.Color('#222a32') };
 
 /** Overcast monsoon light that darkens and closes in while it rains, then clears as the storm passes. */
 function FloodLights({ shadowSize }: { shadowSize: number }) {
@@ -77,7 +77,7 @@ function FloodLights({ shadowSize }: { shadowSize: number }) {
 /** Soft studio fill (procedural, nothing is downloaded): gives walls gentle, believable shading on every side. */
 function Fill() {
   return (
-    <Environment resolution={128} frames={1} environmentIntensity={0.55}>
+    <Environment resolution={128} frames={1} environmentIntensity={0.9}>
       <Lightformer form="rect" intensity={1.4} color="#e6edf5" position={[0, 6, -10]} scale={[14, 6, 1]} />
       <Lightformer form="rect" intensity={0.7} color="#f3e8d8" position={[-9, 3, 4]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
       <Lightformer form="rect" intensity={0.5} color="#dfe6ee" position={[9, 3, 4]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
@@ -93,13 +93,14 @@ export function Scene() {
   const high = quality === 'high';
   const declined = useRef(false);
   const onDecline = () => {
-    if (declined.current || useStore.getState().quality === 'low') return;
+    const st = useStore.getState();
+    if (declined.current || st.quality === 'low' || st.qualityChosen) return;
     declined.current = true;
     useStore.setState({ quality: 'low' });   // not persisted: the next visit tries High again
     useStore.getState().notify('Graphics switched to Low to keep the map smooth. Change it in the map legend.');
   };
   return (
-    <Canvas shadows={{ type: THREE.PCFShadowMap }} dpr={high ? [1, 1.75] : 1} gl={{ antialias: !high, alpha: false, toneMappingExposure: 1.05 }}
+    <Canvas shadows={{ type: THREE.PCFShadowMap }} dpr={high ? [1, 1.75] : 1} gl={{ antialias: !high, alpha: false, toneMappingExposure: 1.2 }}
       camera={{ position: [240, 330, 470], fov: 42, near: 1, far: 7000 }}>
       <PerformanceMonitor bounds={() => [26, 55]} flipflops={2} onDecline={onDecline} />
       {mode === 'flood' ? <FloodLights shadowSize={high ? 2048 : 1024} /> : (

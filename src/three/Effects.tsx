@@ -5,7 +5,7 @@ import { EffectComposer, N8AO, SMAA, Vignette } from '@react-three/postprocessin
 export function Effects() {
   return (
     <EffectComposer multisampling={0}>
-      <N8AO aoRadius={7} distanceFalloff={1.2} intensity={2.4} quality="medium" halfRes color="#1a1612" />
+      <N8AO aoRadius={7} distanceFalloff={1.2} intensity={1.8} quality="medium" halfRes color="#1a1612" />
       <SMAA />
       <Vignette offset={0.32} darkness={0.42} />
     </EffectComposer>

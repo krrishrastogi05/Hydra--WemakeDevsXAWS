@@ -28,7 +28,7 @@ interface State {
   recommendation: OptimizeResult | null; showdown: ShowdownResult | null;
   toast: { msg: string; kind: 'info' | 'error' } | null; flyTo: { x: number; z: number; t: number } | null;
   onboarding: boolean;
-  quality: Quality; setQuality: (q: Quality) => void;
+  quality: Quality; qualityChosen: boolean; setQuality: (q: Quality) => void;
   // actions
   init: () => Promise<void>;
   loadSite: (id: string) => Promise<void>;
@@ -68,7 +68,9 @@ export const useStore = create<State>((set, get) => ({
   toast: null, flyTo: null,
   onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1'; } catch { return true; } })(),
   quality: (() => { try { return localStorage.getItem('hydra-quality') === 'low' ? 'low' : 'high'; } catch { return 'high'; } })(),
-  setQuality: quality => { try { localStorage.setItem('hydra-quality', quality); } catch { /* private mode */ } set({ quality }); },
+  // a choice the viewer made by hand is never overridden by the automatic fallback
+  qualityChosen: (() => { try { return localStorage.getItem('hydra-quality') != null; } catch { return false; } })(),
+  setQuality: quality => { try { localStorage.setItem('hydra-quality', quality); } catch { /* private mode */ } set({ quality, qualityChosen: true }); },
 
   set: p => set(p),
   notify: (msg, kind = 'info') => { clearTimeout(toastTimer); set({ toast: { msg, kind } }); toastTimer = setTimeout(() => set({ toast: null }), 3800); },

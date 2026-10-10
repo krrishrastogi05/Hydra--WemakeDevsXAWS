@@ -153,7 +153,7 @@ function FloodLegend() {
       <div className="lg-title">Water depth</div>
       <div className="ramp"><i /><span>1 cm</span><span>20 cm</span><span>45 cm+</span></div>
       <div className="lg-title">Buildings</div>
-      <div className="swatches"><span><i style={{ background: '#ef4444' }} />water above plinth</span><span><i style={{ background: '#f59e0b' }} />water at the door</span></div>
+      <div className="swatches"><span><i style={{ background: '#d64545' }} />water above plinth</span><span><i style={{ background: '#e0a030' }} />water at the door</span></div>
       <div className="lg-title">Drains</div>
       <div className="swatches"><span><i style={{ background: '#5f4c34' }} />silted, idle</span><span><i style={{ background: '#38bdf8' }} />flowing</span><span><i style={{ background: '#fb923c' }} />full</span><span><i style={{ background: '#ef4444' }} />overflowing</span></div>
       <div className="toggles">
