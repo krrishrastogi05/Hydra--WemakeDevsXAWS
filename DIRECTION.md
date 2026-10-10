@@ -38,7 +38,8 @@ Every monsoon the same Indian streets flood. Cities do spend money on drains and
 - **Recommend tab:** optimizer plans the budget and explains each pick in plain English; one click applies it.
 - **Budget showdown:** no action vs an even spread (average of 3 random plans) vs HYDRA, same budget.
 - **About tab:** every assumption, parameter and data source, with synthetic data labelled.
-- **Demo links:** `?demo=showdown`, `?demo=plan`, `?noguide`, `#gurugram|#chennai|#ranchi`.
+- **Demo links:** `?demo=showdown`, `?demo=plan`, `?noguide`, `#gurugram|#chennai|#ranchi`, and `/heat` after the city for heat mode.
+- **Heat mode (Flood | Heat toggle, key `H`):** a separate engine, plan and budget on the same neighbourhood. Sun path for the chosen day and hours, ray-traced shadows from buildings and trees, a relative pedestrian exposure index, scored bus stops, markets, gates and parks. Tools (keys 1–4): street tree, shade canopy, shaded walkway, cool roof. Same Results / Plan / Recommend / Showdown / About tabs. Heat data comes from `scripts/fetch-heat.mjs` (`public/data/<city>.heat.json`); trees and some places are synthetic and labelled.
 
 ### Headline results (from the engine tests)
 
@@ -53,7 +54,9 @@ The best plan differs by city: Chennai's is mostly desilting and relief drains; 
 
 ### Quality checks
 
-- 6 automated tests pass (`npm test`): water balance closes exactly in all three cities, and HYDRA beats the even spread in all three.
+- 18 automated tests pass (`npm test`):
+  - flood: water balance closes exactly in all three cities, and HYDRA beats the even spread in all three
+  - heat: sun position against NOAA values, building and tree shadows, trees never raise exposure, cool roofs leave the street unchanged, and HYDRA beats the even spread in all three cities (₹25 L: high-exposure places 10 → 5 in Gurugram, 5 → 1 in Chennai, 7 → 1 in Ranchi; an even spread barely moves them)
 - Typecheck and production build are clean.
 - One storm simulates in about 0.5–1 s in the browser (Web Worker); a recommendation takes about 4–7 s.
 
@@ -61,8 +64,10 @@ The best plan differs by city: Chennai's is mostly desilting and relief drains; 
 
 ```
 scripts/fetch-site.mjs   OpenStreetMap (Overpass) + AWS Terrain Tiles  ->  public/data/<city>.json
-src/sim/engine.ts        rain -> roofs/tanks -> downhill runoff + soaking -> drains -> low spots fill and spill
-src/sim/optimizer.ts     find harmful low spots -> trace where runoff ends up -> best harm removed per rupee -> re-simulate
+src/sim/flood/engine.ts     rain -> roofs/tanks -> downhill runoff + soaking -> drains -> low spots fill and spill
+src/sim/flood/optimizer.ts  find harmful low spots -> trace where runoff ends up -> best harm removed per rupee -> re-simulate
+src/sim/heat/engine.ts      sun path -> ray-traced shade -> sun dose + surface + air heat -> footfall-weighted exposure
+src/sim/heat/optimizer.ts   hottest busy cells -> nearby trees / canopies -> exposure removed per rupee, re-traced after each pick
 src/three/               React Three Fiber 3D scene
 src/ui/                  panels, charts, timeline, inspector
 ```
@@ -84,7 +89,7 @@ The whole engine runs in the browser, so hosting is a static site.
 2. **Test the interactions by hand in a real browser:** drawing drains, placing each tool, the showdown's final chart, Recommend → Apply. These have not been exercised by an automated test. *(Small; must-have.)*
 3. **Record the demo video** following the script in section 7. *(Small; must-have.)*
 4. **Amazon Bedrock plan brief:** a small Lambda behind API Gateway that takes the plan and metrics and returns a short brief in English and Hindi, with a local text fallback if the call fails. Strongest extra AWS story. *(Medium.)*
-5. **Heat-risk layer:** roof and road surface heat, tree cover, cool-roof intervention. Extends "climate-resilient" beyond floods. *(Medium–large; only if time allows.)*
+5. **Heat mode follow-ups:** done as a separate mode. Next: calibrate the surface term against Landsat land-surface temperature; replace synthetic trees with a tree census where one exists; test placing walkways and cool roofs by hand in a real browser. *(Small–medium.)*
 6. **More cities or "bring your own area":** the pipeline already takes any lat/lon; add a city by adding an entry to `SITES` in `scripts/fetch-site.mjs` and running `npm run data`. *(Small per city.)*
 
 ## 7. Three-minute demo script
@@ -95,7 +100,8 @@ The whole engine runs in the browser, so hosting is a static site.
 4. **Recommend.** Read one or two of the reasons aloud; apply the plan and run it.
 5. **Budget showdown.** Same money: HYDRA keeps far more homes dry than an even spread.
 6. Switch to Chennai: "flat clay ground, so the best plan is completely different: desilting and relief drains."
-7. Close on the thesis and the AWS pieces.
+7. Flip the toggle to **Heat**: "same neighbourhood, a different problem." Play the day to show the shadows move, point at the red bus stops, press **Recommend** and apply: the trees cluster at the stops and markets, not spread evenly.
+8. Close on the thesis and the AWS pieces.
 
 ## 8. Known limitations (say these honestly if asked)
 
@@ -103,6 +109,7 @@ The whole engine runs in the browser, so hosting is a static site.
 - **Synthetic data is labelled:** drain layout and sizes, silt state, plinth heights, missing building heights, resident estimates, soil factors, and most of Ranchi's buildings.
 - **Elevation is SRTM (~30 m), smoothed.** Depressions deeper than 40 cm are treated as data artefacts.
 - **Gurugram:** about 8 % of the area under mapped houses is still treated as road, where OSM lane lines run through mapped houses.
+- **Heat mode is a relative index**, not UTCI/WBGT or a health prediction. It ignores reflected sunlight from walls, night-time heat release and air movement; cells at the box edge see open sky; trees are modelled at maturity.
 - **Costs are indicative** 2024 Indian rates; real budgets should use the local CPWD or PWD schedule of rates.
 - **Laptop limits:** the development machine runs low on disk and memory; close other apps before demoing.
 

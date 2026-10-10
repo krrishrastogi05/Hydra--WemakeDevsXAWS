@@ -1,14 +1,15 @@
 # HYDRA: climate-resilient Indian city simulator
 
-**Every monsoon the same streets go under. HYDRA shows why, and where a limited budget does the most good.**
+**Every monsoon the same streets go under, and every summer the same bus stops bake. HYDRA shows why, and where a limited budget does the most good.**
 
 ![HYDRA: peak flood in Jacobpura, Old Gurugram](docs/screenshot.png)
 
-HYDRA is an interactive 3D simulator of a real Indian neighbourhood (Gurugram, Chennai or Ranchi), built for the WeMakeDevs × AWS hackathon. You can:
-- run a heavy monsoon storm and watch it flood the streets
-- place stormwater drains, rain gardens, rooftop rainwater harvesting, recharge pits and drain desilting within a fixed rupee budget
-- re-run the *same* storm and compare before and after
-- let HYDRA's optimizer spend the budget for you, and pit it against spending the same money without a plan
+HYDRA is an interactive 3D simulator of a real Indian neighbourhood (Gurugram, Chennai or Ranchi), built for the WeMakeDevs × AWS hackathon. It has two modes on the same neighbourhood, switched with the **Flood | Heat** toggle in the top bar (or `H`):
+
+- **Flood:** run a heavy monsoon storm and watch it flood the streets; place stormwater drains, rain gardens, rooftop rainwater harvesting, recharge pits and drain desilting within a fixed rupee budget.
+- **Heat:** trace the sun through a hot day and see which bus stops, markets, gates and streets have no shade; plant street trees, add shade canopies and shaded walkways, or coat cool roofs within a separate budget.
+
+In both modes you re-run the *same* conditions to compare before and after, let HYDRA's optimizer spend the budget for you, and pit it against spending the same money without a plan. The two modes share the neighbourhood, the camera and the layout; their models, plans, budgets and results are completely separate.
 
 > Project direction, status and next steps: [DIRECTION.md](DIRECTION.md).
 
@@ -21,15 +22,24 @@ HYDRA is an interactive 3D simulator of a real Indian neighbourhood (Gurugram, C
 | Chennai (Velachery), very heavy, ₹75 L | **15 %** | 1 % | 17 vs 2 |
 | Ranchi (Lalpur), heavy, ₹75 L | **19 %** | 2 % | 34 vs 6 |
 
-These figures come from the simulation engine (see `src/sim/optimizer.test.ts`), not from the UI. The best plan differs by city:
+These figures come from the simulation engine (see `src/sim/flood/optimizer.test.ts`), not from the UI. The best plan differs by city:
 - **Chennai** (flat ground, clay soil): mostly drain desilting and relief drains.
 - **Ranchi and Gurugram** (lateritic and sandy soils): rooftop harvesting and recharge pits as well.
+
+**Heat mode, pre-monsoon heatwave afternoon (44 °C, 12:00–16:00), ₹25 L** (from `src/sim/heat/optimizer.test.ts`):
+
+| Neighbourhood | High-exposure places: no action → even spread → HYDRA | Shade where people wait: no action → even spread → HYDRA |
+|---|---|---|
+| Gurugram (Jacobpura) | 10 → 9.7 → **5** | 15 % → 16 % → **38 %** |
+| Chennai (Velachery) | 5 → 5.0 → **1** | 27 % → 27 % → **61 %** |
+| Ranchi (Lalpur) | 7 → 7.0 → **1** | 26 % → 27 % → **67 %** |
 
 ## Demo links
 
 - `/#gurugram`, `/#chennai`, `/#ranchi` open a neighbourhood.
 - `/?demo=showdown#gurugram` runs the budget showdown on load.
 - `/?demo=plan#ranchi` applies HYDRA's recommended plan and plays the storm.
+- `/#chennai/heat` opens a neighbourhood in heat mode; `?demo=plan` and `?demo=showdown` work there too, for example `/?demo=plan#chennai/heat`.
 - Add `noguide` to skip the welcome card, for example `/?noguide&demo=showdown#chennai`.
 
 ## What you can do
@@ -55,18 +65,37 @@ These figures come from the simulation engine (see `src/sim/optimizer.test.ts`),
 6. **Recommend:** the optimizer spends the budget and explains every pick, for example *"Desilting the 160 m drain along Dhandeeswaram Nagar stops ~389 m³ of the 1,769 m³ it overflowed onto the street."* Apply it with one click.
 7. **Budget showdown:** compares no action, an even spread (the average of 3 random plans) and HYDRA, all for the same budget.
 
+### Heat mode
+
+1. **Pick the day and hours:** pre-monsoon heatwave (44 °C, 20 % RH), humid hot day, ordinary summer day or monsoon break; morning commute, afternoon, evening or the whole day. Each neighbourhood has its own heat budget.
+2. **See the exposure:** the ground is coloured by a relative pedestrian heat-exposure index (0–100), and bus stops, markets, school and hospital gates and parks carry a pin with their score. **Play the day** to watch the shadows move hour by hour.
+3. **Intervene within budget** (keys 1–4):
+
+   | Intervention | How you place it | What it does | Illustrative cost |
+   |---|---|---|---|
+   | Street tree | Click open ground, paving or a park | Mature crown 8 m tall, 3.5 m radius, lets 25 % of the sun through | ₹12,000 |
+   | Shade canopy | Click a stop, market or street cell | 5 × 5 m roof at 2.6–3.4 m, blocks 95 % of the sun | ₹1.5 L |
+   | Shaded walkway | Drag along a footpath | Continuous canopy | ₹7,500/m |
+   | Cool roof | Click a roof | Roof albedo 0.2 → 0.7; cuts roof heat, not street sun | ₹350/m² |
+
+4. **Compare, Recommend, Showdown:** the same tabs as flood mode. The heat optimizer tries trees and canopies around the busiest hot spots and scores each by footfall-weighted exposure removed per rupee, re-tracing the shade against what is already there so overlapping shade is not double counted.
+5. **Inspect:** hover any spot to see its index and why it is high: hours of direct sun, surface type, air heat index and how many people use it.
+
 ## How it works
 
 ```
-scripts/fetch-site.mjs   data pipeline: Overpass (OSM) + Terrain Tiles on AWS -> public/data/<site>.json (5 m grid)
-src/sim/                 pure TypeScript engine; runs in Web Workers and in Vitest
-  model.ts               grid, intervention catalogue, costs, validation, IMD design storms
-  engine.ts              fill-and-spill pluvial flood model + drain network
-  optimizer.ts           hydrology-aware greedy optimizer + "even spread" baseline
-  worker.ts              simulate / optimize / showdown off the main thread
-src/three/               React Three Fiber scene: terrain diorama, buildings, water shader, rain, drains, interventions
-src/ui/                  panels, charts, timeline, inspector
+scripts/fetch-site.mjs   flood data: Overpass (OSM) + Terrain Tiles on AWS -> public/data/<site>.json (5 m grid)
+scripts/fetch-heat.mjs   heat data: trees, bus stops, markets (OSM + labelled synthetic) -> public/data/<site>.heat.json
+src/sim/                 pure TypeScript engines; run in Web Workers and in Vitest
+  grid.ts, types.ts      the shared neighbourhood grid (both modes)
+  flood/                 model (catalogue, costs, IMD storms), engine (fill-and-spill + drains), optimizer, worker
+  heat/                  solar (NOAA sun position), shadow (ray tracing), engine (exposure index), model, optimizer, worker
+src/store.ts             shared state + flood state;  src/heatStore.ts  heat state (separate plan, budget, results)
+src/three/               shared scene (terrain, buildings, camera); flood/ (water, rain, drains); heat/ (sun, shade map, trees)
+src/ui/                  shared shell (top bar, tools, tabs); flood panels; heat/ panels, timeline, inspector
 ```
+
+Rule: `src/sim/heat` never imports from `src/sim/flood` and vice versa; both use only the shared grid.
 
 **Engine** (transparent and simplified, documented in the app's *About* tab). Each minute:
 1. **Rain** falls as an IMD-category design storm.
@@ -85,6 +114,14 @@ Mass balance closes to < 0.01 m³ on 40,000 m³ storms, and a storm runs in abou
 4. Score every candidate (roof harvesting, rain garden, recharge pit, a relief drain found with Dijkstra to a drain with spare capacity or the trunk outfall, desilting) by harmful water removed per rupee.
 5. Pick lazily and greedily within the round budget, then re-simulate and refine for up to 6 rounds.
 
+**Heat engine** (also documented in the app's *About* tab):
+1. **Sun path** every half hour for the chosen day and the site's latitude and longitude (NOAA solar position equations), with clear-sky direct sunlight reduced by cloud.
+2. **Shadows:** from every 5 m cell, a ray 1.1 m above the ground is traced toward the sun through the grid. Buildings (3.2 m per storey + plinth) and hills block it; tree crowns let 25 % through, canopies 5 %.
+3. **Exposure index (0–100)** = 50 × sun dose + 20 × surface heating (asphalt > paving > bare soil > grass) + 30 × air heat (NOAA heat index of temperature and humidity), with wind trimming the sun and surface terms.
+4. **Footfall weights** by road class; bus stops, markets, gates and parks count more.
+
+It is a transparent *relative* index for comparing places and plans under the same weather, not UTCI, WBGT or a health prediction. A full day traces in about 50 ms, a ₹25 L recommendation in about 0.2 s.
+
 ## Data and honesty
 
 - **OpenStreetMap** via the Overpass API (© OpenStreetMap contributors, ODbL): buildings and their levels, roads by class and name, land use, schools and hospitals.
@@ -95,6 +132,7 @@ Mass balance closes to < 0.01 m³ on 40,000 m³ storms, and a storm runs in abou
   - the roadside drain layout, sizes and silt state
   - micro-relief
   - soil infiltration factors
+  - heat mode: street and park trees (OSM maps almost none here), bus stops where OSM has fewer than three, market streets, tree heights and crowns, footfall weights
 
   These assumptions are listed in the *About* tab.
 
@@ -105,9 +143,10 @@ This is a screening and decision-support tool, not a hydraulic design tool. Unit
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # engine + optimizer tests (mass balance, HYDRA beats even spread)
+npm test             # flood + heat engine and optimizer tests (mass balance, sun position, shadows, HYDRA beats even spread)
 npm run build        # static site in dist/
 npm run data         # optional: re-fetch OSM + terrain for all sites (cached in data/raw)
+npm run data:heat    # optional: rebuild the heat-mode trees and places (cached in data/raw)
 ```
 
 ## Deploy on AWS
@@ -118,6 +157,6 @@ HYDRA is a static site; the engine runs in the browser.
 
 ## Roadmap
 
-- Heat-risk layer (land-surface temperature, roof albedo, tree cover).
+- Heat mode: satellite land-surface temperature to calibrate the surface term; a tree census where one exists.
 - An Amazon Bedrock "ward officer brief" that summarises the chosen plan in English and Hindi.
 - Upload your own ward boundary.
