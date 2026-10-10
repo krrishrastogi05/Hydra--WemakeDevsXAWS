@@ -2,6 +2,8 @@
 import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey, type Mode, type Tool } from '../store';
+import { useBackend } from '../api';
+import { isCustomSite } from '../shared/area';
 import { useHeat } from '../heatStore';
 import { HEAT_CATALOG } from '../sim/heat/model';
 import { HEAT_TOOLS, HeatControls, HeatLegend, heatToolHow } from './heat/HeatChrome';
@@ -28,6 +30,9 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     canopy: <><path d="M2.5 8L10 4l7.5 4z" /><path d="M5 8v9m10-9v9" /></>,
     walkway: <><path d="M3 7h14" /><path d="M4 7v9m6-9v9m6-9v9" /><path d="M2 17h16" /></>,
     coolroof: <><path d="M3 10l7-6 7 6" /><path d="M5 9v8h10V9" /><path d="M13 2.5l1-1m2 3l1.3-.3M16 6l1 1" /></>,
+    doc: <><path d="M5 2.5h7l3.5 3.5v11.5h-10.5z" /><path d="M12 2.5V6h3.5M7.5 10h5m-5 3h5" /></>,
+    link: <><path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1" /><path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1" /></>,
+    plus: <path d="M10 4v12M4 10h12" />,
   };
   return <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{p[name]}</svg>;
 }
@@ -76,15 +81,23 @@ function FloodControls() {
 
 export function TopBar() {
   const s = useStore(useShallow(st => ({ sites: st.sites, siteId: st.siteId, loadSite: st.loadSite, mode: st.mode, grid: st.grid })));
+  const backend = useBackend(st => st.status);
+  // the demo cities, plus the user's own area while it is open (the rest are listed in the Add area dialog)
+  const shown = s.sites.filter(x => !isCustomSite(x.id) || x.id === s.siteId);
   return (
     <header className="topbar">
       <div className="logo"><Icon name={s.mode === 'heat' ? 'sun' : 'drop'} size={20} /><b>HYDRA</b><span>Climate-resilient city simulator</span></div>
       <nav className="cities" aria-label="Neighbourhood">
-        {s.sites.map(x => (
-          <button key={x.id} className={x.id === s.siteId ? 'on' : ''} onClick={() => x.id !== s.siteId && s.loadSite(x.id)} title={x.blurb}>
-            {x.city}<small>{x.name.split(',')[0]}</small>
+        {shown.map(x => (
+          <button key={x.id} className={`${x.id === s.siteId ? 'on' : ''}${isCustomSite(x.id) ? ' custom' : ''}`} onClick={() => x.id !== s.siteId && s.loadSite(x.id)} title={x.blurb}>
+            {x.city || 'Your area'}<small>{x.name.split(',')[0]}</small>
           </button>
         ))}
+        {backend === 'up' && (
+          <button className="add" onClick={() => useStore.setState({ addArea: true })} title="Build any neighbourhood in India from OpenStreetMap and AWS terrain data">
+            <span><Icon name="plus" size={13} /> Area</span><small>anywhere in India</small>
+          </button>
+        )}
       </nav>
       {s.grid && <ModeSwitch />}
       <div className="controls">{s.mode === 'flood' ? <FloodControls /> : <HeatControls />}</div>

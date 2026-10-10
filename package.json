@@ -11,12 +11,16 @@
     "preview": "vite preview",
     "test": "vitest run",
     "data": "node scripts/fetch-site.mjs",
-    "data:heat": "node scripts/fetch-heat.mjs"
+    "data:heat": "node scripts/fetch-heat.mjs",
+    "api": "npm --prefix backend run dev",
+    "api:test": "npm --prefix backend test",
+    "api:build": "npm --prefix backend run build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "@react-three/postprocessing": "^3.1.3",
+    "leaflet": "^1.9.4",
     "postprocessing": "^6.39.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -24,6 +28,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",

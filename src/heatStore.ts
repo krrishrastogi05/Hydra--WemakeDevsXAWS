@@ -2,6 +2,7 @@
 // recommendations. It shares only the neighbourhood (site, grid), the tool, hover/selection and the toast with the main store.
 import { create } from 'zustand';
 import { useStore } from './store';
+import { siteDataUrl } from './api';
 import { heatEngine, type HeatOptimizeResult, type HeatShowdownResult } from './simClient';
 import { HEAT_CATALOG, HEAT_SCENARIOS, HEAT_WINDOWS, heatCostOf, heatPlanCost, validateHeat } from './sim/heat/model';
 import { fmtINR } from './sim/grid';
@@ -45,7 +46,9 @@ export const useHeat = create<HeatState>((set, get) => ({
     if (!site || get().loading || (get().siteId === site.id && get().baseline)) return;
     set({ loading: true, siteId: site.id, ...fresh, heat: null });
     try {
-      const heat = await (await fetch(`${import.meta.env.BASE_URL}data/${site.id}.heat.json`)).json() as HeatSite;
+      const res = await fetch(siteDataUrl(site.id, 'heat'));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const heat = await res.json() as HeatSite;
       if (useStore.getState().site?.id !== site.id) { set({ loading: false }); return; }
       await heatEngine.load(site, heat);
       set({ heat });

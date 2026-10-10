@@ -86,6 +86,7 @@ These figures come from the simulation engine (see `src/sim/flood/optimizer.test
 ```
 scripts/fetch-site.mjs   flood data: Overpass (OSM) + Terrain Tiles on AWS -> public/data/<site>.json (5 m grid)
 scripts/fetch-heat.mjs   heat data: trees, bus stops, markets (OSM + labelled synthetic) -> public/data/<site>.heat.json
+scripts/lib/             the two builders behind those scripts, shared with the backend's "add your own area" job
 src/sim/                 pure TypeScript engines; run in Web Workers and in Vitest
   grid.ts, types.ts      the shared neighbourhood grid (both modes)
   flood/                 model (catalogue, costs, IMD storms), engine (fill-and-spill + drains), optimizer, worker
@@ -93,9 +94,24 @@ src/sim/                 pure TypeScript engines; run in Web Workers and in Vite
 src/store.ts             shared state + flood state;  src/heatStore.ts  heat state (separate plan, budget, results)
 src/three/               shared scene (terrain, buildings, camera); flood/ (water, rain, drains); heat/ (sun, shade map, trees)
 src/ui/                  shared shell (top bar, tools, tabs); flood panels; heat/ panels, timeline, inspector
+src/brief.ts             officer brief (English + Hindi) written in the browser; briefInput.ts gathers the numbers
+src/shared/              contracts shared with the backend: saved plans, area requests
+src/api.ts               client for the optional backend; sharedPlan.ts uses it
+backend/                 optional API (Lambda + API Gateway + DynamoDB + S3), see backend/README.md
 ```
 
 Rule: `src/sim/heat` never imports from `src/sim/flood` and vice versa; both use only the shared grid.
+
+### The backend (optional)
+
+The simulator never needs a server: every storm, sun trace and recommendation still runs in the browser. So does the **officer brief**: in the Plan tab, *Officer brief* turns the plan and its before/after numbers into a one-page note for a ward officer, in English and Hindi, to copy or print.
+
+The backend adds the two things a browser cannot do on its own:
+
+- **Share links.** *Copy share link* saves the plan with its neighbourhood, storm or day, and budget, and gives a link (`/?plan=<id>`) that reopens exactly that plan.
+- **Add your own area.** *+ Area* in the top bar opens a map of India. Pick a built-up spot (or search for it), give it a name and a soil type, and the backend builds a new 600 m × 600 m neighbourhood from OpenStreetMap and AWS Terrain Tiles with the same builder as the demo cities. It takes about a minute, then the area works in both modes.
+
+An area build outlasts an API Gateway request, so the API stores a job, a worker Lambda runs it, and the app polls for the result. Locally the same API runs as a small Node server with files on disk.
 
 **Engine** (transparent and simplified, documented in the app's *About* tab). Each minute:
 1. **Rain** falls as an IMD-category design storm.
@@ -140,6 +156,8 @@ This is a screening and decision-support tool, not a hydraulic design tool. Unit
 
 ## Run it
 
+Vite 8 and Vitest 5 need Node 22.12 or newer.
+
 ```bash
 npm install
 npm run dev          # http://localhost:5173
@@ -149,14 +167,23 @@ npm run data         # optional: re-fetch OSM + terrain for all sites (cached in
 npm run data:heat    # optional: rebuild the heat-mode trees and places (cached in data/raw)
 ```
 
+With the backend, in a second terminal (the app looks for it on `http://localhost:8787` in dev):
+
+```bash
+npm --prefix backend install
+npm run api          # local API: files in backend/.data
+npm run api:test     # API tests (no AWS, no network)
+```
+
 ## Deploy on AWS
 
-HYDRA is a static site; the engine runs in the browser.
+The app is a static site; the engine runs in the browser.
 - **AWS Amplify Hosting:** connect the repo; `amplify.yml` builds `dist/`.
 - **S3 + CloudFront:** `npm run build`, upload `dist/` to a bucket, and serve it through CloudFront with the default root object `index.html`.
+
+The backend is an AWS SAM stack: `cd backend && npm run build && sam deploy --guided`. Then set the stack's `ApiUrl` output as `VITE_API_URL` in Amplify's environment variables and rebuild the app. Without `VITE_API_URL` a production build stays a plain static site. Details: [backend/README.md](backend/README.md).
 
 ## Roadmap
 
 - Heat mode: satellite land-surface temperature to calibrate the surface term; a tree census where one exists.
-- An Amazon Bedrock "ward officer brief" that summarises the chosen plan in English and Hindi.
-- Upload your own ward boundary.
+- Upload your own ward boundary instead of a 600 m square.

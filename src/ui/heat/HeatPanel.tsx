@@ -11,6 +11,7 @@ import { heatIndexBand } from '../../sim/heat/solar';
 import type { HeatIntervention, HeatInterventionType, HeatMetrics, HeatResult, HeatSite } from '../../sim/heat/types';
 import { CompareBars, LineSeries, type BarRow } from '../charts';
 import { Icon } from '../Chrome';
+import { ShareReport } from '../Share';
 import { cellX, cellZ, half } from '../../three/geo';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
@@ -126,6 +127,7 @@ function PlanTab() {
         );
       })}
       {s.plan.length > 0 && <div className="row-actions"><button className="btn primary" onClick={() => s.runPlan(true)} disabled={s.running}>Run the day with this plan</button><button className="btn ghost" onClick={s.clearPlan}>Clear</button></div>}
+      {s.plan.length > 0 && <ShareReport />}
     </div>
   );
 }

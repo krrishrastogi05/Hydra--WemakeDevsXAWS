@@ -72,7 +72,7 @@ src/three/               React Three Fiber 3D scene
 src/ui/                  panels, charts, timeline, inspector
 ```
 
-The whole engine runs in the browser, so hosting is a static site.
+The whole engine runs in the browser, so hosting is a static site. An optional backend (`backend/`, see section 5) adds share links and new areas; the officer brief is written in the browser.
 
 ## 5. AWS story (for the WeMakeDevs × AWS hackathon)
 
@@ -80,7 +80,9 @@ The whole engine runs in the browser, so hosting is a static site.
 |---|---|---|
 | Terrain Tiles on the AWS Registry of Open Data (`elevation-tiles-prod`) | **Done** | Elevation for every city |
 | AWS Amplify Hosting | **Ready** (`amplify.yml` in repo), not yet deployed | Public demo URL |
-| Amazon Bedrock "ward officer brief" | Not started | Turn the chosen plan into a one-page summary in English and Hindi |
+| AWS Lambda + API Gateway (HTTP API) | **Built** (`backend/template.yaml`, SAM), not yet deployed | API, plus a worker Lambda for area builds |
+| Amazon DynamoDB | **Built**, not yet deployed | Saved and shared plans (`?plan=<id>` links), area build status |
+| Amazon S3 | **Built**, not yet deployed | Neighbourhoods built on demand ("+ Area": any spot in India from OSM + AWS terrain) |
 | Amazon S3 + CloudFront | Alternative to Amplify | Same static hosting |
 
 ## 6. Next steps, in priority order
@@ -88,9 +90,9 @@ The whole engine runs in the browser, so hosting is a static site.
 1. **Deploy on AWS Amplify** and put the live URL in the README. Needs an AWS account; connect this repo and Amplify uses `amplify.yml`. *(Small; must-have for judging.)*
 2. **Test the interactions by hand in a real browser:** drawing drains, placing each tool, the showdown's final chart, Recommend → Apply. These have not been exercised by an automated test. *(Small; must-have.)*
 3. **Record the demo video** following the script in section 7. *(Small; must-have.)*
-4. **Amazon Bedrock plan brief:** a small Lambda behind API Gateway that takes the plan and metrics and returns a short brief in English and Hindi, with a local text fallback if the call fails. Strongest extra AWS story. *(Medium.)*
+4. **Deploy the backend** (`backend/README.md`): `npm run build && sam deploy --guided`, then set `VITE_API_URL` in Amplify. Share links and "+ Area" are built and tested locally (Koramangala, Bengaluru built end to end). The officer brief (English + Hindi) runs in the browser and needs no backend. Amazon Bedrock was left out on purpose to keep the running cost at zero. *(Small once an account is ready.)*
 5. **Heat mode follow-ups:** done as a separate mode. Next: calibrate the surface term against Landsat land-surface temperature; replace synthetic trees with a tree census where one exists; test placing walkways and cool roofs by hand in a real browser. *(Small–medium.)*
-6. **More cities or "bring your own area":** the pipeline already takes any lat/lon; add a city by adding an entry to `SITES` in `scripts/fetch-site.mjs` and running `npm run data`. *(Small per city.)*
+6. **More demo cities:** users can now add any area through "+ Area" (backend). To ship another built-in city, add an entry to `SITES` in `scripts/lib/demo-sites.mjs` and run `npm run data`. *(Small per city.)*
 
 ## 7. Three-minute demo script
 

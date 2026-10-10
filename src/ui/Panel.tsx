@@ -11,6 +11,7 @@ import { Icon } from './Chrome';
 import { cellX, cellZ, half } from '../three/geo';
 import { useHeat } from '../heatStore';
 import { HeatTab } from './heat/HeatPanel';
+import { ShareReport } from './Share';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 const m3 = (v: number) => `${num(Math.round(v))} m³`;
@@ -120,6 +121,7 @@ function PlanTab() {
         );
       })}
       {s.plan.length > 0 && <div className="row-actions"><button className="btn primary" onClick={() => s.runPlan(true)} disabled={s.running}>Run storm with this plan</button><button className="btn ghost" onClick={s.clearPlan}>Clear</button></div>}
+      {s.plan.length > 0 && <ShareReport />}
     </div>
   );
 }
