@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  HYDRA API: saved and shared plans (DynamoDB) and new neighbourhoods built on demand from
-  OpenStreetMap + AWS Terrain Tiles (Lambda + S3). Build first (npm run build in backend/), then: sam deploy --guided
+  HYDRA API: the flood and heat engine on AWS Lambda, saved and shared plans (DynamoDB) and new neighbourhoods
+  built on demand from OpenStreetMap + AWS Terrain Tiles (Lambda + S3). Build first (npm run build in backend/), then: sam deploy
 
 Parameters:
   AllowOrigin:
@@ -50,12 +50,14 @@ Resources:
         ThrottlingBurstLimit: 20
         ThrottlingRateLimit: 10
 
+  # Routes, plus the engine for /calc: 1769 MB is one full vCPU (the engine is single-threaded), so a storm takes about
+  # a second and a showdown a few. 29 s is API Gateway's limit; dist/api/data holds the demo cities.
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: dist/api
-      MemorySize: 512
-      Timeout: 20
+      MemorySize: 1769
+      Timeout: 29
       Environment:
         Variables:
           WORKER_FUNCTION: !Ref WorkerFunction

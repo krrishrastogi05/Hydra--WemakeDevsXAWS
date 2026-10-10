@@ -1,19 +1,29 @@
 # HYDRA backend
 
-An optional API for the HYDRA app. The simulator and the officer brief run entirely in the browser; this adds the two things a browser cannot do alone:
+An optional API for the HYDRA app. When it is up, it runs every calculation; the app falls back to the same engine in the browser when it is not. It also adds the two things a browser cannot do alone: share links and new areas.
 
 | Feature | Route | Runs on AWS as |
 |---|---|---|
+| Run a storm or a hot day; recommend a plan for a budget; budget showdown | `POST /calc/flood/simulate`, `/calc/flood/optimize`, `/calc/flood/showdown`, and the same under `/calc/heat/` | ApiFunction (the engine in `src/sim`, one full vCPU) |
 | Save and share a plan | `POST /plans`, `GET /plans/{id}` | DynamoDB |
 | Add your own area anywhere in India | `POST /areas`, `GET /areas/{id}`, `GET /areas/{id}/data`, `GET /areas/{id}/heat` | Worker Lambda (OpenStreetMap + AWS Terrain Tiles), files in S3 |
 | Health | `GET /health` | |
 
 ```
-browser ── API Gateway (HTTP API) ── ApiFunction ──┬── DynamoDB   plans, area build status
+browser ── API Gateway (HTTP API) ── ApiFunction ──┬── engine     storms, sun traces, recommendations (src/sim)
+                                         │         ├── DynamoDB   plans, area build status
                                          │         └── S3         built areas (served through the API)
                                          └─ async invoke ── WorkerFunction ──┬── Overpass API (OpenStreetMap)
                                                                              └── Terrain Tiles on AWS Open Data
 ```
+
+### Calculations
+
+The browser sends ids and a plan, for example `{ "siteId": "gurugram", "stormId": "heavy", "antecedent": "normal", "plan": [...] }` (heat: `scenarioId` and `windowId`; optimize and showdown add `budget`). The server loads the neighbourhood itself (the demo cities ship with the Lambda in `dist/api/data`; added areas come from S3), builds the storm or day with the same settings as the browser (`src/shared/calc.ts`), checks each intervention against the ones before it with the map's placement rules, and recomputes every cost. A bad request gets a 400 such as `Intervention 1 (pit): Recharge pits go on ground, paving or a road edge`.
+
+`simulate` returns the whole result, including the map's animation, in a small binary format (`src/shared/wire.ts`: a JSON header plus the raw typed arrays), gzipped: 0.3–0.6 MB. Measured locally, a storm takes 0.1–0.6 s of engine time and the slowest showdown (₹2 Cr, extreme storm) under 3 s, so `optimize` and `showdown` simply return JSON, well inside API Gateway's 29 s limit; the function gets 1769 MB, one full vCPU, because the engine is single-threaded. `test/calc.test.ts` checks that every number from the API equals a direct run of the engine.
+
+### New areas
 
 An area build takes about a minute, longer than an API Gateway request may last. So the API stores a job, invokes the worker asynchronously and returns at once, and the app polls until the area is ready. The same spot, soil and name always give the same area, so a repeat request reuses the finished build.
 
