@@ -7,6 +7,7 @@ import { Icon } from '../Chrome';
 import { downloadCsv } from '../viz';
 import * as F from './flood';
 import * as Ht from './heat';
+import { ComparePlans } from './compare';
 
 const FLOOD = [
   { id: 'summary', label: 'Summary', hint: 'Headline results and key moments' },
@@ -17,6 +18,7 @@ const FLOOD = [
   { id: 'hotspots', label: 'Hotspots', hint: 'Streets and facilities hit' },
   { id: 'cost', label: 'Cost & value', hint: 'Budget, value for money, cost against benefit' },
   { id: 'strategies', label: 'Strategies', hint: 'HYDRA against an even spread' },
+  { id: 'compare', label: 'Compare plans', hint: 'Your saved plans, side by side' },
   { id: 'method', label: 'Data & method', hint: 'Sources, parameters, model checks' },
 ];
 const HEAT = [
@@ -26,6 +28,7 @@ const HEAT = [
   { id: 'places', label: 'Places people wait', hint: 'Bus stops, markets, gates, parks' },
   { id: 'cost', label: 'Cost & value', hint: 'Budget, value for money, cost against benefit' },
   { id: 'strategies', label: 'Strategies', hint: 'HYDRA against an even spread' },
+  { id: 'compare', label: 'Compare plans', hint: 'Your saved plans, side by side' },
   { id: 'method', label: 'Data & method', hint: 'Sources, parameters, model checks' },
 ];
 
@@ -47,6 +50,7 @@ export default function AnalyticsModal() {
   const exportCsv = () => downloadCsv(`hydra-${mode}-${site?.id ?? 'area'}.csv`, mode === 'flood' ? F.floodCsv(f) : Ht.heatCsv(h));
 
   const content = (() => {
+    if (cur.id === 'compare') return <ComparePlans close={close} />;
     if (mode === 'flood') {
       switch (cur.id) {
         case 'timeline': return <F.Timeline f={f} />;
@@ -83,8 +87,9 @@ export default function AnalyticsModal() {
             <span className="an-sub">{cond} · {n ? `your plan, ${n} interventions` : 'no plan yet'}</span>
           </div>
           <div className="an-tools">
+            <button className="btn primary sm" onClick={() => useStore.setState({ report: true })} title="A paginated report of every section, ready to save as PDF"><Icon name="doc" size={14} />Report (PDF)</button>
             <button className="btn sm" onClick={exportCsv} title="Download the key figures, time series and tables as CSV"><Icon name="download" size={14} />Export CSV</button>
-            <button className="btn sm" onClick={() => window.print()} title="Print this section, or save it as a PDF"><Icon name="print" size={14} />Print / PDF</button>
+            <button className="btn sm" onClick={() => window.print()} title="Print this section, or save it as a PDF"><Icon name="print" size={14} />Print section</button>
             <button className="an-x" onClick={close} aria-label="Close analytics"><Icon name="close" /></button>
           </div>
         </header>

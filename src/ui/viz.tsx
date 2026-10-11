@@ -59,7 +59,7 @@ export function TimeChart({ lines, fmt, height = 210, xFmt = v => `${Math.round(
     <div className="viz" ref={ref} onMouseLeave={() => setHx(null)}>
       <LegendRow items={lines.map(l => ({ label: l.label, color: l.color, hollow: l.dashed }))} />
       {w > 0 && (
-        <svg width={W} height={H} role="img" aria-label={lines.map(l => l.label).join(', ')}
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={lines.map(l => l.label).join(', ')}
           onMouseMove={e => { const r = e.currentTarget.getBoundingClientRect(); const x = x0 + ((e.clientX - r.left - L) / (W - L - R)) * (x1 - x0); setHx(Math.max(x0, Math.min(x1, x))); }}>
           {[0, 0.25, 0.5, 0.75, 1].map(f => <g key={f}><line className="v-grid" x1={L} x2={W - R} y1={sy(ymax * f)} y2={sy(ymax * f)} /><text className="v-axis" x={L - 6} y={sy(ymax * f) + 4} textAnchor="end">{fmt(ymax * f)}</text></g>)}
           {xt.map((x, i) => <text key={i} className="v-axis" x={sx(x)} y={H - 10} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}>{xFmt(x)}</text>)}
@@ -102,7 +102,7 @@ export function Columns({ xs, ys, color, fmt, height = 170, xFmt = v => `${Math.
   return (
     <div className="viz" ref={ref} onMouseLeave={() => setHi(null)}>
       {w > 0 && (
-        <svg width={W} height={H} role="img" aria-label={label}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
           {[0, 0.5, 1].map(f => <g key={f}><line className="v-grid" x1={L} x2={W - R} y1={sy(ymax * f)} y2={sy(ymax * f)} /><text className="v-axis" x={L - 6} y={sy(ymax * f) + 4} textAnchor="end">{fmt(ymax * f)}</text></g>)}
           {Array.from({ length: n }, (_, i) => {
             const h = sy(0) - sy(ys[i]);
@@ -132,7 +132,7 @@ export function Histogram({ bins, series, fmt, height = 210, xLabel }: { bins: s
     <div className="viz" ref={ref} onMouseLeave={() => setHi(null)}>
       <LegendRow items={series.map(s => legendOf(s.key))} />
       {w > 0 && (
-        <svg width={W} height={H} role="img" aria-label={bins.join(', ')}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={bins.join(', ')}>
           {[0, 0.25, 0.5, 0.75, 1].map(f => <g key={f}><line className="v-grid" x1={L} x2={W - R} y1={sy(ymax * f)} y2={sy(ymax * f)} /><text className="v-axis" x={L - 6} y={sy(ymax * f) + 4} textAnchor="end">{fmt(ymax * f)}</text></g>)}
           {bins.map((b, i) => {
             const gx = L + i * gw + (gw - bw * series.length - 2 * (series.length - 1)) / 2;
@@ -224,7 +224,7 @@ export function Scatter({ pts, xFmt, yFmt, xLabel, yLabel, height = 280 }: { pts
   return (
     <div className="viz" ref={ref} onMouseLeave={() => setHi(null)}>
       {w > 0 && (
-        <svg width={W} height={H} role="img" aria-label={`${yLabel} against ${xLabel}`}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${yLabel} against ${xLabel}`}>
           {[0, 0.25, 0.5, 0.75, 1].map(f => { const y = ylo + (ymax - ylo) * f; return <g key={f}><line className="v-grid" x1={L} x2={W - R} y1={sy(y)} y2={sy(y)} /><text className="v-axis" x={L - 6} y={sy(y) + 4} textAnchor="end">{yFmt(y)}</text></g>; })}
           {[0, 0.25, 0.5, 0.75, 1].map(f => <text key={f} className="v-axis" x={sx(xmax * f)} y={H - 24} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}>{xFmt(xmax * f)}</text>)}
           <text className="v-axis" x={(L + W - R) / 2} y={H - 6} textAnchor="middle">{xLabel}</text>

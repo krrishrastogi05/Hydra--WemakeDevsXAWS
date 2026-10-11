@@ -14,10 +14,11 @@ const KEYS: Record<string, Tool> = { '1': 'drain', '2': 'garden', '3': 'rwh', '4
 const HEAT_KEYS: Record<string, Tool> = { '1': 'tree', '2': 'canopy', '3': 'walkway', '4': 'coolroof', v: 'inspect', x: 'erase' };
 const AddArea = lazy(() => import('./ui/AddArea'));   // brings Leaflet, so only when opened
 const AnalyticsModal = lazy(() => import('./ui/analytics/AnalyticsModal'));
+const Report = lazy(() => import('./ui/analytics/Report'));
 
 export default function App() {
   const loading = useStore(s => s.loading), error = useStore(s => s.error), ready = useStore(s => !!s.grid && !!s.baseline), mode = useStore(s => s.mode);
-  const heatLoading = useHeat(s => s.loading), addArea = useStore(s => s.addArea), analytics = useStore(s => s.analytics);
+  const heatLoading = useHeat(s => s.loading), addArea = useStore(s => s.addArea), analytics = useStore(s => s.analytics), report = useStore(s => s.report);
   useEffect(() => { boot(); }, []);
   // ?tour starts the guided tour once the neighbourhood is ready (a link to send judges)
   useEffect(() => { if (ready && new URLSearchParams(location.search).has('tour') && useStore.getState().tour == null) useStore.setState({ tour: 0, onboarding: false }); }, [ready]);
@@ -28,6 +29,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (heat) h.undo(); else s.undo(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase(), keys = heat ? HEAT_KEYS : KEYS;
+      if (s.report) return;   // the report preview is on top
       if (s.analytics && k !== 'a') return;   // the analytics view is on top: leave the map alone
       if (s.tour != null) return;   // the tour has the keyboard (Enter / → / Esc)
       if (keys[k]) useStore.setState({ tool: keys[k], draft: null });
@@ -62,6 +64,7 @@ export default function App() {
       {ready && <Onboarding />}
       {addArea && <Suspense fallback={null}><AddArea /></Suspense>}
       {ready && analytics && <Suspense fallback={null}><AnalyticsModal /></Suspense>}
+      {ready && report && <Suspense fallback={null}><Report /></Suspense>}
       {ready && <Tour />}
       {(loading || error) && <div className="loader"><div className="drop" /><p>{error ?? loading}</p></div>}
       {!loading && !error && mode === 'heat' && heatLoading && <div className="loader soft"><div className="drop sun" /><p>Tracing the sun across the neighbourhood…</p></div>}

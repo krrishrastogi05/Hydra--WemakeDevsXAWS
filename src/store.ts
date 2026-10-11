@@ -35,6 +35,8 @@ interface State {
   split: boolean; splitX: number;
   /** the guided tour's step, or null when it is not running */
   tour: number | null;
+  /** the printable report is open */
+  report: boolean;
   busy: { p: number; msg: string } | null;
   recommendation: Recommendation | null; showdown: ShowdownResult | null;
   toast: { msg: string; kind: 'info' | 'error' } | null; flyTo: { x: number; z: number; t: number } | null;
@@ -85,7 +87,7 @@ export const useStore = create<State>((set, get) => ({
   baseline: null, current: null, currentKey: '', running: false,
   view: 'baseline', peak: true, time: 0, playing: false, speed: 1,
   overlay: 'none', showLabels: true, showDrains: true,
-  panel: 'overview', optimize: 'recommend', analytics: null, split: false, splitX: 0.42, tour: null, busy: null, recommendation: null, showdown: null,
+  panel: 'overview', optimize: 'recommend', analytics: null, split: false, splitX: 0.42, tour: null, report: false, busy: null, recommendation: null, showdown: null,
   toast: null, flyTo: null, addArea: false,
   onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1'; } catch { return true; } })(),
   quality: (() => { try { return localStorage.getItem('hydra-quality') === 'low' ? 'low' : 'high'; } catch { return 'high'; } })(),

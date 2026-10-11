@@ -13,6 +13,8 @@ import { heatPlanKey, useHeat } from '../heatStore';
 import { HEAT_SCENARIOS, HEAT_WINDOWS } from '../sim/heat/model';
 import { HeatTab } from './heat/HeatPanel';
 import { ShareReport } from './Share';
+import { SaveBar } from './analytics/compare';
+import { useSaved } from '../savedPlans';
 import { CalcSourceTag, ProgressBar } from './calc';
 import { BudgetBreakdown, Empty, Metric, MoreLink, Optimize, Section, ValueRows, Verdict, num, openAnalytics } from './kit';
 import { GroupedBars } from './viz';
@@ -210,6 +212,7 @@ function PlanCost() {
           );
         })}
       </Section>
+      {s.plan.length > 0 && <SaveCompare />}
       {s.plan.length > 0 && <ShareReport />}
     </div>
   );
@@ -407,5 +410,15 @@ export function SidePanel() {
         )}
       </div>
     </aside>
+  );
+}
+
+function SaveCompare() {
+  const mode = useStore(s => s.mode), siteId = useStore(s => s.site?.id);
+  const n = useSaved(s => s.entries.filter(e => e.mode === mode && e.siteId === siteId).length);
+  return (
+    <Section title="Save and compare" hint={n ? `${n} saved for this neighbourhood` : 'keep this version, try another, compare'} aside={n > 0 && <MoreLink section="compare">Compare plans</MoreLink>}>
+      <SaveBar />
+    </Section>
   );
 }

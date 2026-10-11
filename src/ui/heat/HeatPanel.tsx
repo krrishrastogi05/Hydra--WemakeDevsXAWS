@@ -12,6 +12,8 @@ import type { HeatIntervention, HeatInterventionType, HeatMetrics, HeatResult, H
 import { CompareBars, LineSeries, type BarRow } from '../charts';
 import { Icon } from '../Chrome';
 import { ShareReport } from '../Share';
+import { SaveBar } from '../analytics/compare';
+import { useSaved } from '../../savedPlans';
 import { CalcSourceTag, ProgressBar } from '../calc';
 import { cellX, cellZ, half } from '../../three/geo';
 import { BudgetBreakdown, Empty, Metric, MoreLink, Optimize, Section, ValueRows, Verdict, openAnalytics } from '../kit';
@@ -184,6 +186,7 @@ function PlanCost() {
           );
         })}
       </Section>
+      {s.plan.length > 0 && <SaveCompare />}
       {s.plan.length > 0 && <ShareReport />}
     </div>
   );
@@ -312,4 +315,14 @@ export function HeatTab({ panel }: { panel: string }) {
   if (panel === 'plan') return <PlanCost />;
   if (panel === 'optimize') return <Optimize recommend={<Recommend />} showdown={<Showdown />} />;
   return <AboutTab />;
+}
+
+function SaveCompare() {
+  const mode = useStore(s => s.mode), siteId = useStore(s => s.site?.id);
+  const n = useSaved(s => s.entries.filter(e => e.mode === mode && e.siteId === siteId).length);
+  return (
+    <Section title="Save and compare" hint={n ? `${n} saved for this neighbourhood` : 'keep this version, try another, compare'} aside={n > 0 && <MoreLink section="compare">Compare plans</MoreLink>}>
+      <SaveBar />
+    </Section>
+  );
 }

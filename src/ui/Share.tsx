@@ -43,6 +43,7 @@ export function ShareReport() {
       <h4>Share and report</h4>
       <div className="row-actions">
         <button className="btn" onClick={openBrief} disabled={preparing}><Icon name="doc" size={15} />{preparing ? 'Running the plan…' : 'Officer brief'} <small className="muted">EN · हिं</small></button>
+        <button className="btn" onClick={() => useStore.setState({ report: true })} title="Every chart and table, the cost ledger and this brief, as one document"><Icon name="print" size={15} />Full report <small className="muted">PDF</small></button>
         {backend === 'up' && <button className="btn" onClick={share} disabled={sharing}><Icon name="link" size={15} />{sharing ? 'Saving…' : 'Copy share link'}</button>}
       </div>
       {link && <input className="sharelink" readOnly value={link} onFocus={e => e.currentTarget.select()} aria-label="Share link" />}
@@ -80,7 +81,7 @@ function BriefModal({ brief, onClose }: { brief: Brief; onClose: () => void }) {
 // Markdown-lite (as produced in src/brief.ts): "## " headings, "- " bullets, **bold**, paragraphs. No HTML is
 // ever injected; everything renders as text nodes.
 const inline = (s: string) => s.split(/(\*\*[^*]+\*\*)/g).map((part, k) => (part.startsWith('**') && part.endsWith('**') && part.length > 4 ? <b key={k}>{part.slice(2, -2)}</b> : part));
-function Rich({ text }: { text: string }) {
+export function Rich({ text }: { text: string }) {
   const out: ReactNode[] = [];
   let list: string[] = [];
   const flush = () => { if (list.length) { const items = list; out.push(<ul key={out.length}>{items.map((l, k) => <li key={k}>{inline(l)}</li>)}</ul>); list = []; } };
