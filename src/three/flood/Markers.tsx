@@ -34,7 +34,7 @@ function useFar() {
 
 // Labels are HTML overlays. They stay mounted and are hidden with CSS: unmounting drei <Html> during a render
 // makes React warn about synchronously unmounting a root, and remounting is slower than toggling.
-export function Markers() {
+export function Markers({ hotspots: showHot = true }: { hotspots?: boolean }) {
   const grid = useStore(s => s.grid)!;
   const showLabels = useStore(s => s.showLabels);
   const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
@@ -47,7 +47,7 @@ export function Markers() {
     const y = (cells.length ? Math.max(...cells.map(c => grid.z[c])) : 0) * VE + b.levels * 3.2 + 4;
     return { x, y, z, label: b.name || b.use, kind: b.use };
   }), [grid, h]);
-  const hotspots = (result?.hotspots ?? []).slice(0, HOT_SLOTS);
+  const hotspots = showHot ? (result?.hotspots ?? []).slice(0, HOT_SLOTS) : [];
   const hide = (on: boolean) => (on ? undefined : { display: 'none' });
   return (
     <group>

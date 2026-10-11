@@ -5,6 +5,8 @@ import { Scene } from './three/Scene';
 import { MapLegend, Onboarding, Toast, Toolbar, TopBar } from './ui/Chrome';
 import { SidePanel } from './ui/Panel';
 import { Inspector, Timeline } from './ui/Timeline';
+import { SplitBar } from './ui/SplitBar';
+import { Tour } from './ui/Tour';
 import { useHeat } from './heatStore';
 import { HeatInspector, HeatTimeline } from './ui/heat/HeatTimeline';
 
@@ -17,6 +19,8 @@ export default function App() {
   const loading = useStore(s => s.loading), error = useStore(s => s.error), ready = useStore(s => !!s.grid && !!s.baseline), mode = useStore(s => s.mode);
   const heatLoading = useHeat(s => s.loading), addArea = useStore(s => s.addArea), analytics = useStore(s => s.analytics);
   useEffect(() => { boot(); }, []);
+  // ?tour starts the guided tour once the neighbourhood is ready (a link to send judges)
+  useEffect(() => { if (ready && new URLSearchParams(location.search).has('tour') && useStore.getState().tour == null) useStore.setState({ tour: 0, onboarding: false }); }, [ready]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, select, textarea')) return;
@@ -25,10 +29,12 @@ export default function App() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase(), keys = heat ? HEAT_KEYS : KEYS;
       if (s.analytics && k !== 'a') return;   // the analytics view is on top: leave the map alone
+      if (s.tour != null) return;   // the tour has the keyboard (Enter / → / Esc)
       if (keys[k]) useStore.setState({ tool: keys[k], draft: null });
       else if (k === 'escape') useStore.setState({ tool: 'inspect', draft: null, selection: null });
       else if (k === 'h') s.setMode(heat ? 'flood' : 'heat');
       else if (k === 'a') useStore.setState({ analytics: s.analytics ? null : 'summary' });
+      else if (k === 't' && s.tour == null) useStore.setState({ tour: 0, onboarding: false });
       else if (heat) {
         if (k === 'p') useHeat.setState({ summary: !h.summary, playing: false });
         else if (k === 'r' && !h.running && h.plan.length) h.runPlan(true);
@@ -42,6 +48,7 @@ export default function App() {
   return (
     <div className="app" data-mode={mode}>
       <div className="stage"><Scene /></div>
+      {ready && mode === 'flood' && <SplitBar />}
       <TopBar />
       {ready && (
         <>
@@ -55,6 +62,7 @@ export default function App() {
       {ready && <Onboarding />}
       {addArea && <Suspense fallback={null}><AddArea /></Suspense>}
       {ready && analytics && <Suspense fallback={null}><AnalyticsModal /></Suspense>}
+      {ready && <Tour />}
       {(loading || error) && <div className="loader"><div className="drop" /><p>{error ?? loading}</p></div>}
       {!loading && !error && mode === 'heat' && heatLoading && <div className="loader soft"><div className="drop sun" /><p>Tracing the sun across the neighbourhood…</p></div>}
     </div>

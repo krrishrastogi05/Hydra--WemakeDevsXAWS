@@ -477,6 +477,38 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
   .print-an .row-actions, .print-an .seg, .print-an .dtable > .link { display: none; }
 }
 
+/* ---------- guided tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.tour-dim { position: absolute; inset: 0; background: rgba(3, 6, 10, .5); }
+.tour-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgba(3, 6, 10, .55); transition: left .25s, top .25s, width .25s, height .25s; }
+.tour-card { position: absolute; width: 360px; display: grid; gap: 8px; padding: 16px 18px; border-radius: 16px; pointer-events: auto; background: #101a26; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.03) inset; transition: left .25s, top .25s; animation: rise .2s ease-out; }
+.tour-top { display: flex; align-items: center; justify-content: space-between; }
+.tour-top .kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+.an-x.sm { width: 26px; height: 26px; border-radius: 7px; }
+.tour-card h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+.tour-card p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.tour-card p b { color: var(--ink); }
+.tour-busy { display: flex; align-items: center; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,.04); color: var(--ink-2); font-size: 12px; }
+.tour-foot { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.tour-dots { display: flex; gap: 4px; margin-right: auto; }
+.tour-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(148, 178, 210, .25); }
+.tour-dots i.done { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.tour-dots i.on { width: 16px; border-radius: 3px; background: var(--accent); }
+.tour-cta { justify-self: start; }
+.tour-link { font-size: 12px; margin-left: 2px; }
+@media (prefers-reduced-motion: reduce) { .tour-spot, .tour-card { transition: none; animation: none; } }
+
+/* ---------- before/after split view ---------- */
+.splitbar { position: absolute; top: var(--top); bottom: 0; width: 0; z-index: 15; pointer-events: none; }
+.split-line { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 0 14px rgba(255,255,255,.35); }
+.split-handle { position: absolute; top: 50%; left: -19px; width: 38px; height: 38px; margin-top: -19px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: rgba(13, 21, 31, .9); color: #fff; cursor: ew-resize; pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.45); touch-action: none; }
+.split-handle:hover { background: var(--accent); color: #04121c; }
+.split-tag { position: absolute; top: 14px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.35); backdrop-filter: blur(6px); }
+.split-tag.left { right: 14px; background: rgba(13, 21, 31, .85); border: 1.5px dashed #8a96a6; color: #e2e8f0; }
+.split-tag.right { left: 14px; background: rgba(25, 158, 112, .9); border: 1.5px solid #34d399; color: #fff; }
+.ab button svg { vertical-align: -2px; margin-right: 3px; }
+
 /* ---------- map labels (HTML in 3D) ---------- */
 .tag { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 500; white-space: nowrap; background: rgba(12, 18, 26, .6); border: 1px solid rgba(148, 178, 210, .2); color: var(--ink-2); user-select: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .tag-road { color: #e2e8f0; }

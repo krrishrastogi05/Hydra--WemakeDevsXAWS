@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import type { SimResult } from '../../sim/flood/types';
 import { VE, cellX, cellY, cellZ } from '../geo';
 import { terrainGeometry } from '../Terrain';
+import { useShownResult } from '../split';
 
 const displayed = () => { const s = useStore.getState(); return (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline; };
 
@@ -62,7 +63,7 @@ const waterFrag = /* glsl */`
 
 export function Water() {
   const grid = useStore(s => s.grid)!;
-  const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
+  const result = useShownResult();
   const geo = useMemo(() => {
     const g = terrainGeometry(grid), pos = g.getAttribute('position'), ground = new Float32Array(grid.n);
     for (let i = 0; i < grid.n; i++) ground[i] = pos.getY(i);
@@ -140,7 +141,7 @@ export function Drains() {
   const grid = useStore(s => s.grid)!;
   const show = useStore(s => s.showDrains);
   const plan = useStore(s => s.plan);
-  const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
+  const result = useShownResult();
   const ref = useRef<THREE.InstancedMesh>(null);
   const lipRef = useRef<THREE.InstancedMesh>(null);
   const layout = useMemo(() => {

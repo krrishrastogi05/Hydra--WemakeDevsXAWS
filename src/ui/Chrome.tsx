@@ -38,6 +38,7 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     doc: <><path d="M5 2.5h7l3.5 3.5v11.5h-10.5z" /><path d="M12 2.5V6h3.5M7.5 10h5m-5 3h5" /></>,
     link: <><path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1" /><path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1" /></>,
     plus: <path d="M10 4v12M4 10h12" />,
+    split: <><path d="M10 2v16" /><path d="M3 5h4v10H3zM13 5h4v10h-4z" /></>,
     chart: <><path d="M3 17h14" /><path d="M5.5 14V9m4 5V5m4 9v-3" /></>,
     expand: <path d="M11 3h6v6M9 17H3v-6M17 3l-6 6M3 17l6-6" />,
     download: <><path d="M10 3v10m-4-4l4 4 4-4" /><path d="M4 16h12" /></>,
@@ -246,6 +247,7 @@ export function Onboarding() {
             <span>Trace the sun through a hot day, find bus stops, markets and streets with no shade, then plant trees or add canopies.</span>
           </button>
         </div>
+        <button className="btn primary tour-cta" onClick={() => { close(); useStore.setState({ tour: 0 }); }}><Icon name="play" size={14} /> Take the 90-second tour</button>
         <p className="fine">In both modes: re-run the same conditions to compare, let <kbd>Recommend</kbd> spend a fixed budget, and use <kbd>Budget showdown</kbd> to compare a data-driven plan with spending the same money evenly. Switch any time with the toggle at the top (or <kbd>H</kbd>). The two modes use separate models, plans and budgets. Both are simplified, transparent models with stated assumptions, not engineering design tools. Synthetic data is labelled.</p>
       </div>
     </div>

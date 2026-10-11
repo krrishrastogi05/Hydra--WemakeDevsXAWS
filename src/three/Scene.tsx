@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '../store';
-import { Terrain } from './Terrain';
+import { RiskOverlay, Terrain } from './Terrain';
+import { SideGroup, SplitRenderer, useSplitOn } from './split';
 import { Buildings } from './Buildings';
 import { Drains, Rain, Water, rainRate } from './flood/Water';
 import { Interventions } from './flood/Interventions';
@@ -192,6 +193,7 @@ export function Scene() {
   const grid = useStore(s => s.grid), mode = useStore(s => s.mode), quality = useStore(s => s.quality);
   const heatReady = useHeat(s => !!s.heat && !!s.baseline && s.siteId === grid?.site.id);
   const high = quality === 'high';
+  const split = useSplitOn();
   const declined = useRef(false);
   const orbitRef = useRef<OrbitControlsImpl>(null);
   useShiftToPan(orbitRef);
@@ -221,11 +223,16 @@ export function Scene() {
           {mode === 'flood' && (
             <>
               <SiteTrees />
-              <Drains />
-              <Interventions />
-              <Water />
               <Rain />
-              <Markers />
+              <Markers hotspots={!split} />
+              {split ? (
+                <>
+                  <SideGroup side="left"><RiskOverlay /><Drains /><Water /></SideGroup>
+                  <SideGroup side="right"><RiskOverlay /><Drains /><Interventions /><Water /></SideGroup>
+                </>
+              ) : (
+                <><RiskOverlay /><Drains /><Interventions /><Water /></>
+              )}
             </>
           )}
           {mode === 'heat' && heatReady && (
@@ -247,7 +254,7 @@ export function Scene() {
         touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
       />
       <CameraRig />
-      <Effects tier={high ? 'high' : 'low'} />
+      {split ? <SplitRenderer /> : <Effects tier={high ? 'high' : 'low'} />}
     </Canvas>
   );
 }

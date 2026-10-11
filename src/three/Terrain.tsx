@@ -6,6 +6,7 @@ import { COVER } from '../sim/types';
 import type { Grid } from '../sim/grid';
 import { VE, half } from './geo';
 import { useTools } from './useTools';
+import { useShownResult } from './split';
 
 const ROAD_FILL: Record<string, string> = {
   motorway: '#2e3033', trunk: '#303235', primary: '#35373a', secondary: '#3a3c3f', tertiary: '#424447',
@@ -128,13 +129,10 @@ function skirtGeometry(g: Grid) {
 
 export function Terrain() {
   const grid = useStore(s => s.grid)!;
-  const overlay = useStore(s => (s.mode === 'flood' ? s.overlay : 'none'));
-  const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
   const geo = useMemo(() => terrainGeometry(grid), [grid]);
   const sharp = useStore(s => s.quality === 'high');
   const tex = useMemo(() => baseMap(grid, sharp ? 4096 : 2048), [grid, sharp]);
   const skirt = useMemo(() => skirtGeometry(grid), [grid]);
-  const risk = useMemo(() => (result && overlay === 'risk' ? riskMap(grid, result.maxDepth) : null), [grid, result, overlay]);
   const { terrain } = useTools();
   const size = half(grid) * 2;
   return (
@@ -142,11 +140,6 @@ export function Terrain() {
       <mesh geometry={geo} receiveShadow {...terrain}>
         <meshStandardMaterial map={tex} roughness={0.96} metalness={0} />
       </mesh>
-      {risk && (
-        <mesh geometry={geo} renderOrder={1}>
-          <meshBasicMaterial map={risk} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
-        </mesh>
-      )}
       <mesh geometry={skirt}>
         <meshStandardMaterial vertexColors roughness={1} side={THREE.DoubleSide} />
       </mesh>
@@ -156,5 +149,20 @@ export function Terrain() {
         <meshStandardMaterial color="#2f2b28" roughness={1} side={THREE.DoubleSide} />
       </mesh>
     </group>
+  );
+}
+
+/** The flood-risk tint over the ground, for whichever result this subtree shows. */
+export function RiskOverlay() {
+  const grid = useStore(s => s.grid)!;
+  const on = useStore(s => s.mode === 'flood' && s.overlay === 'risk');
+  const result = useShownResult();
+  const geo = useMemo(() => terrainGeometry(grid), [grid]);
+  const risk = useMemo(() => (result && on ? riskMap(grid, result.maxDepth) : null), [grid, result, on]);
+  if (!risk) return null;
+  return (
+    <mesh geometry={geo} renderOrder={1}>
+      <meshBasicMaterial map={risk} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+    </mesh>
   );
 }

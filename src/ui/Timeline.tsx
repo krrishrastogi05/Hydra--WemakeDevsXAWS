@@ -9,12 +9,13 @@ import { placeName } from '../sim/flood/optimizer';
 import { DEPTH } from '../sim/flood/engine';
 import { Icon } from './Chrome';
 import { RainStrip } from './charts';
+import { mapMiddle } from './SplitBar';
 
 export function Timeline() {
-  const s = useStore(useShallow(st => ({ playing: st.playing, peak: st.peak, time: st.time, speed: st.speed, view: st.view, baseline: st.baseline, current: st.current, currentKey: st.currentKey, plan: st.plan, storm: st.stormId })));
+  const s = useStore(useShallow(st => ({ playing: st.playing, peak: st.peak, time: st.time, speed: st.speed, view: st.view, split: st.split, baseline: st.baseline, current: st.current, currentKey: st.currentKey, plan: st.plan, storm: st.stormId })));
   const res = (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline;
   const end = res ? res.frameTimes[res.nFrames - 1] : 0;
-  const hasPlanRun = !!s.current && s.currentKey !== '' && s.current !== s.baseline;
+  const hasPlanRun = !!s.current && s.currentKey !== '' && s.current !== s.baseline, splitOn = s.split && hasPlanRun;
   useEffect(() => {
     if (!s.playing) return;
     let raf = 0, last = performance.now();
@@ -35,9 +36,12 @@ export function Timeline() {
     <div className="timeline">
       <button className="btn primary round" onClick={play} aria-label={s.playing ? 'Pause' : 'Play the storm'}><Icon name={s.playing ? 'pause' : 'play'} size={16} /></button>
       <div className="ab" role="group" aria-label="Which result to show">
-        <button className={s.view === 'baseline' ? 'on' : ''} onClick={() => useStore.setState({ view: 'baseline' })}>No action</button>
-        <button className={s.view === 'plan' ? 'on' : ''} disabled={!hasPlanRun} onClick={() => useStore.setState({ view: 'plan' })} title={hasPlanRun ? '' : 'Add interventions and press Run storm'}>
+        <button className={!splitOn && s.view === 'baseline' ? 'on' : ''} onClick={() => useStore.setState({ view: 'baseline', split: false })}>No action</button>
+        <button className={!splitOn && s.view === 'plan' ? 'on' : ''} disabled={!hasPlanRun} onClick={() => useStore.setState({ view: 'plan', split: false })} title={hasPlanRun ? '' : 'Add interventions and press Run storm'}>
           Your plan{hasPlanRun && planKey(s.plan) !== s.currentKey ? ' (outdated)' : ''}
+        </button>
+        <button className={splitOn ? 'on' : ''} disabled={!hasPlanRun} onClick={() => useStore.setState(splitOn ? { split: false } : { split: true, splitX: mapMiddle() })} title={hasPlanRun ? 'Both side by side: drag the divider' : 'Add interventions and press Run storm'}>
+          <Icon name="split" size={13} /> Split
         </button>
       </div>
       <button className={`btn ghost${s.peak ? ' on' : ''}`} onClick={() => useStore.setState({ peak: !s.peak, playing: false })} title="Show the deepest water each place reached">Peak</button>
@@ -64,7 +68,7 @@ export function Inspector() {
   // what is under the pointer always wins; a pinned (clicked) item shows when the pointer is off the map
   const hovered = s.hover ? (s.hover.building >= 0 ? { kind: 'building' as const, building: s.hover.building } : s.hover.cell >= 0 ? { kind: 'cell' as const, cell: s.hover.cell } : null) : null;
   const target = hovered ?? s.selection;
-  if (!target) return <div className="inspector muted">Hover the map to inspect a street, drain or building. Click to pin.<br /><small>Drag to rotate · Shift-drag or right-drag to pan · Hold Space and move the mouse (or press the arrow keys) to pan · Scroll to zoom</small></div>;
+  if (!target) return <div className="inspector muted">Hover the map to inspect a street, drain or building. Click to pin. <button className="link tour-link" onClick={() => useStore.setState({ tour: 0 })}>New here? Take the tour</button><br /><small>Drag to rotate · Shift-drag or right-drag to pan · Hold Space and move the mouse (or press the arrow keys) to pan · Scroll to zoom</small></div>;
   const plan = s.current && s.currentKey ? s.current : null, pinned = !hovered && !!s.selection;
   const close = pinned ? <button className="x" onClick={() => useStore.setState({ selection: null })} aria-label="Unpin"><Icon name="close" size={14} /></button> : null;
   const cmp = (label: string, a: number, b: number | null, fmt: (v: number) => string, lowerBetter = true) => (

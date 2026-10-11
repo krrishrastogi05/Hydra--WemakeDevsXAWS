@@ -9,6 +9,8 @@ import { VE, half, hash } from './geo';
 import { useTools } from './useTools';
 import { DEPTH } from '../sim/flood/engine';
 import { useHeat } from '../heatStore';
+import type { SimResult } from '../sim/flood/types';
+import { useShownResult, useSideHook, useSplitOn } from './split';
 
 // Muted plaster and concrete, as Indian neighbourhoods actually look; strong colour is kept for flood risk only.
 const PLASTER = ['#e8e2d6', '#ddd5c4', '#d6cbb5', '#cfc4ae', '#e2d9c8', '#c9c3b8', '#d9c7a8', '#cdb8a0', '#d8cfc6', '#bfb7ab'];
@@ -143,16 +145,20 @@ export function Buildings() {
   const overlay = useStore(s => s.overlay);
   const plan = useStore(s => s.plan);
   const coolRoofs = useHeat(s => s.plan);
-  const result = useStore(s => (s.view === 'baseline' ? s.baseline : s.current) ?? s.baseline);
+  const split = useSplitOn();
+  const viewRes = useShownResult(), planRes = useStore(s => s.current ?? s.baseline), baseRes = useStore(s => s.baseline);
   const showRisk = useStore(s => s.peak || s.time > 0);
   const mesh = useMemo(() => buildBuildings(grid), [grid]);
   const material = useMemo(facadeMaterial, []);
   const { buildings } = useTools();
   const tankRef = useRef<THREE.InstancedMesh>(null), rwhRef = useRef<THREE.InstancedMesh>(null), shadowRef = useRef<THREE.InstancedMesh>(null);
+  // the split view keeps a second colour buffer for the no-action side and swaps it in for that pass
+  const main = useMemo(() => mesh.geometry.getAttribute('color') as THREE.BufferAttribute, [mesh]);
+  const alt = useMemo(() => new THREE.BufferAttribute(new Float32Array(main.array.length), 3), [main]);
+  useSideHook(side => { if (mesh.geometry.getAttribute('color') !== (side === 'left' ? alt : main)) mesh.geometry.setAttribute('color', side === 'left' ? alt : main); });
 
   // wall colours: pastel, flood risk (flood mode), cool roofs (heat mode), or data provenance
-  useEffect(() => {
-    const attr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute, arr = attr.array as Float32Array;
+  const paintInto = (arr: Float32Array, result: SimResult | null) => {
     arr.set(mesh.baseColor);
     const nrm = mesh.geometry.getAttribute('normal');
     // tints into the existing plaster colour rather than overwriting it, so risk colour still reads as a wall, not a flat paint fill
@@ -171,8 +177,10 @@ export function Buildings() {
       const d = result.doorstep[k];
       if (d > b.plinth) paint(k, FLOODED, 0.65); else if (d > DEPTH.wet) paint(k, AT_RISK, 0.65);
     });
-    attr.needsUpdate = true;
-  }, [mesh, overlay, result, showRisk, grid, mode, coolRoofs]);
+  };
+  const mainRes = split ? planRes : viewRes;
+  useEffect(() => { paintInto(main.array as Float32Array, mainRes); main.needsUpdate = true; }, [mesh, overlay, mainRes, showRisk, grid, mode, coolRoofs]);
+  useEffect(() => { if (split) { paintInto(alt.array as Float32Array, baseRes); alt.needsUpdate = true; } }, [split, mesh, overlay, baseRes, showRisk, grid, mode]);
 
   // rooftop water tanks (decorative: most Indian flat roofs carry one) and blue RWH tanks from the plan
   const rwh = useMemo(() => new Set(mode === 'flood' ? plan.filter(p => p.type === 'rwh').map(p => p.building!) : []), [plan, mode]);
