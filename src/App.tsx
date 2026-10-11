@@ -20,8 +20,14 @@ export default function App() {
   const loading = useStore(s => s.loading), error = useStore(s => s.error), ready = useStore(s => !!s.grid && !!s.baseline), mode = useStore(s => s.mode);
   const heatLoading = useHeat(s => s.loading), addArea = useStore(s => s.addArea), analytics = useStore(s => s.analytics), report = useStore(s => s.report);
   useEffect(() => { boot(); }, []);
-  // ?tour starts the guided tour once the neighbourhood is ready (a link to send judges)
-  useEffect(() => { if (ready && new URLSearchParams(location.search).has('tour') && useStore.getState().tour == null) useStore.setState({ tour: 0, onboarding: false }); }, [ready]);
+  // The tour starts by itself once the neighbourhood is ready, for first-time visitors only (or with ?tour, a link to
+  // send judges). Demo, shared-plan and noguide links skip it: they already show something specific.
+  useEffect(() => {
+    if (!ready) return;
+    const q = new URLSearchParams(location.search), st = useStore.getState();
+    const first = !st.tourSeen && !q.has('noguide') && !q.has('demo') && !q.has('plan');
+    if ((q.has('tour') || first) && st.tour == null) useStore.setState({ tour: 0, onboarding: false });
+  }, [ready]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, select, textarea')) return;

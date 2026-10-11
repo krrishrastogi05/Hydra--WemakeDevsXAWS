@@ -85,8 +85,9 @@ export function Tour() {
   const steps = useRef<Step[]>(FLOOD), [busy, setBusy] = useState(false), [box, setBox] = useState<Box>(null);
   const card = useRef<HTMLDivElement>(null), [pos, setPos] = useState({ left: 0, top: 0 });
   const [, tick] = useState(0);
-  const end = () => useStore.setState({ tour: null });
-  const next = () => { const t = useStore.getState().tour; if (t == null) return; useStore.setState({ tour: t + 1 >= steps.current.length ? null : t + 1 }); };
+  // closing the tour any way (×, Skip, Esc, Finish) marks it seen, so it is never offered automatically again
+  const end = () => useStore.getState().endTour();
+  const next = () => { const t = useStore.getState().tour; if (t == null) return; if (t + 1 >= steps.current.length) end(); else useStore.setState({ tour: t + 1 }); };
 
   // pick the script when the tour starts, then run each step's action on entry
   useEffect(() => { if (step === 0) steps.current = useStore.getState().mode === 'heat' ? HEAT : FLOOD; }, [step]);
@@ -161,4 +162,10 @@ export function Tour() {
     </div>,
     document.body,
   );
+}
+
+/** "Take the tour", offered only until the tour has been closed once. */
+export function TourLink() {
+  const seen = useStore(s => s.tourSeen);
+  return seen ? null : <> <button className="link tour-link" onClick={() => useStore.setState({ tour: 0 })}>New here? Take the tour</button></>;
 }

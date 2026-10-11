@@ -35,6 +35,8 @@ interface State {
   split: boolean; splitX: number;
   /** the guided tour's step, or null when it is not running */
   tour: number | null;
+  /** the tour has been closed once (any way): it is never offered automatically again */
+  tourSeen: boolean; endTour: () => void;
   /** the printable report is open */
   report: boolean;
   busy: { p: number; msg: string } | null;
@@ -87,9 +89,13 @@ export const useStore = create<State>((set, get) => ({
   baseline: null, current: null, currentKey: '', running: false,
   view: 'baseline', peak: true, time: 0, playing: false, speed: 1,
   overlay: 'none', showLabels: true, showDrains: true,
-  panel: 'overview', optimize: 'recommend', analytics: null, split: false, splitX: 0.42, tour: null, report: false, busy: null, recommendation: null, showdown: null,
+  panel: 'overview', optimize: 'recommend', analytics: null, split: false, splitX: 0.42, tour: null, report: false, busy: null,
+  tourSeen: (() => { try { return localStorage.getItem('hydra-tour-seen') === '1'; } catch { return false; } })(),
+  endTour: () => { try { localStorage.setItem('hydra-tour-seen', '1'); localStorage.setItem('hydra-onboarded', '1'); } catch { /* private mode: seen for this visit */ } set({ tour: null, tourSeen: true, onboarding: false }); },
+  recommendation: null, showdown: null,
   toast: null, flyTo: null, addArea: false,
-  onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1'; } catch { return true; } })(),
+  // first-time visitors get the tour instead (see App.tsx); the welcome card is for returning visitors who have not dismissed it
+  onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1' && localStorage.getItem('hydra-tour-seen') === '1'; } catch { return true; } })(),
   quality: (() => { try { return localStorage.getItem('hydra-quality') === 'low' ? 'low' : 'high'; } catch { return 'high'; } })(),
   // a choice the viewer made by hand is never overridden by the automatic fallback
   qualityChosen: (() => { try { return localStorage.getItem('hydra-quality') != null; } catch { return false; } })(),

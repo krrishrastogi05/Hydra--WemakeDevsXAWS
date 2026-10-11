@@ -10,6 +10,7 @@ import { heatPlaceName } from '../../sim/heat/optimizer';
 import { roofTops } from '../../sim/heat/shadow';
 import { frameIndex, indexColor } from '../../three/heat/HeatLayer';
 import { Icon } from '../Chrome';
+import { TourLink } from '../Tour';
 import { clock } from './HeatPanel';
 
 const compass = (az: number) => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8];
@@ -71,7 +72,7 @@ export function HeatInspector() {
   if (!g || !s.baseline || !s.heat) return null;
   const hovered = st.hover ? (st.hover.building >= 0 ? { kind: 'building' as const, building: st.hover.building } : st.hover.cell >= 0 ? { kind: 'cell' as const, cell: st.hover.cell } : null) : null;
   const target = hovered ?? st.selection;
-  if (!target) return <div className="inspector muted">Hover the map to see how hot a street, stop or square gets and why. Click to pin. <button className="link tour-link" onClick={() => useStore.setState({ tour: 0 })}>New here? Take the tour</button><br /><small>Drag to rotate · Shift-drag or right-drag to pan · Hold Space and move the mouse (or press the arrow keys) to pan · Scroll to zoom</small></div>;
+  if (!target) return <div className="inspector muted">Hover the map to see how hot a street, stop or square gets and why. Click to pin.<TourLink /><br /><small>Drag to rotate · Shift-drag or right-drag to pan · Hold Space and move the mouse (or press the arrow keys) to pan · Scroll to zoom</small></div>;
   const plan = s.current && s.currentKey ? s.current : null, pinned = !hovered && !!st.selection, b0 = s.baseline;
   const close = pinned ? <button className="x" onClick={() => useStore.setState({ selection: null })} aria-label="Unpin"><Icon name="close" size={14} /></button> : null;
   const cmp = (label: string, a: number, b: number | null, fmt: (v: number) => string, lowerBetter = true) => (
