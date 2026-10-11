@@ -14,7 +14,10 @@ import { HEAT_SCENARIOS, HEAT_WINDOWS } from '../sim/heat/model';
 import { HeatTab } from './heat/HeatPanel';
 import { ShareReport } from './Share';
 import { CalcSourceTag, ProgressBar } from './calc';
-import { BudgetBreakdown, Empty, Metric, Optimize, Section, ValueRows, Verdict, num } from './kit';
+import { BudgetBreakdown, Empty, Metric, MoreLink, Optimize, Section, ValueRows, Verdict, num, openAnalytics } from './kit';
+import { GroupedBars } from './viz';
+import { StrategyCards, StrategyVerdict } from './analytics/common';
+import { floodStrat } from './analytics/strat';
 
 const m3 = (v: number) => `${num(Math.round(v))} m³`;
 const pct = (a: number, b: number) => (a > 0 ? Math.round((1 - b / a) * 100) : 0);
@@ -109,6 +112,7 @@ function Overview() {
           <Kpi label="Road disruption" base={b.roadKmHours} after={a?.roadKmHours ?? null} fmt={v => `${num(v, 1)} km·h`} hint="Kilometres of road × hours above 15 cm" />
           <Kpi label="Flood impact index" base={100} after={a ? (a.impact / Math.max(1e-9, b.impact)) * 100 : null} fmt={v => num(v)} hint="Harm-weighted standing water (roads by class, homes by residents, schools and hospitals ×), no action = 100" />
         </div>
+        <MoreLink section="summary">Full analytics: timelines, distributions, drains, hotspots</MoreLink>
       </Section>
       <LiveNow shown={shown} base={shown !== s.baseline ? s.baseline : null} />
     </div>
@@ -123,6 +127,11 @@ function Analytics() {
   return (
     <div className="tab">
       <Status />
+      <button className="promo" onClick={() => openAnalytics('timeline')}>
+        <span className="promo-icon"><Icon name="chart" size={20} /></span>
+        <span><b>Open full analytics</b><small>Storm timeline, water balance, depth and duration, drain load, hotspots, cost against benefit and strategy comparison, with CSV export.</small></span>
+        <Icon name="expand" size={14} />
+      </button>
       <Section title="Standing water over time" hint="volume on streets and open ground">
         <LineSeries unit="m³" fmt={v => (v >= 1000 ? `${num(v / 1000, 1)}k` : num(v))} series={[
           { key: 'none', xs: s.baseline.frameTimes, ys: s.baseline.pondedSeries },
@@ -164,7 +173,7 @@ function PlanCost() {
   const b = s.baseline.metrics, a = run?.metrics;
   return (
     <div className="tab">
-      <Section title="Budget"><BudgetBreakdown spent={spent} budget={s.budget} parts={parts} note="Indicative 2024 Indian unit rates. Use the local CPWD / PWD schedule of rates for a real estimate." /></Section>
+      <Section title="Budget" aside={<MoreLink section="cost">Cost analysis</MoreLink>}><BudgetBreakdown spent={spent} budget={s.budget} parts={parts} note="Indicative 2024 Indian unit rates. Use the local CPWD / PWD schedule of rates for a real estimate." /></Section>
       {s.plan.length > 0 && (
         <Section title="Value for money" hint={a ? 'from the latest run of this plan' : 'run the storm with this plan to see it'}>
           {a ? <ValueRows rows={[
@@ -290,39 +299,27 @@ function Showdown() {
   const s = useStore(useShallow(st => ({ grid: st.grid, budget: st.budget, sd: st.showdown, busy: st.busy, run: st.runShowdown, setPlan: st.setPlan })));
   const g = s.grid;
   if (!g) return null;
-  const sd = s.sd;
-  let headline = null;
-  if (sd) {
-    const avg = (k: keyof Metrics) => sd.spreads.reduce((a, x) => a + (x.metrics[k] as number), 0) / sd.spreads.length;
-    const savedH = sd.base.buildingsFlooded - sd.hydra.metrics.buildingsFlooded, savedS = sd.base.buildingsFlooded - avg('buildingsFlooded');
-    const cutH = pct(sd.base.impact, sd.hydra.metrics.impact), cutS = pct(sd.base.impact, avg('impact'));
-    headline = (
-      <>
-        <div className="headline">
-          <div><b>{num(Math.max(0, savedH))}</b><span>homes kept dry by HYDRA's plan</span></div>
-          <div><b>{num(Math.max(0, savedS), 1)}</b><span>by an even spread of the same {fmtINR(sd.budget)}</span></div>
-        </div>
-        <p className="sub">Flood impact falls <b>{cutH}%</b> with HYDRA against <b>{cutS}%</b> for the even spread{cutS > 0 ? `, ${num(cutH / cutS, 1)}× the effect for the same money` : ''}. Same storm, same budget, same neighbourhood: only the placement differs.</p>
-      </>
-    );
-  }
+  const sd = s.sd, d = floodStrat(sd, g);
   return (
     <>
       <Section title="Budget showdown" hint={`same storm, same ${fmtINR(s.budget)}`}>
-        <p className="sub">Three strategies: do nothing; spend it <b>evenly</b> on drains, rain gardens, roof harvesting and pits at random spots (average of 3 such plans, with their range); or let <b>HYDRA</b> place it using terrain, drainage connectivity and flood risk.</p>
+        <p className="sub">Three strategies for the same money: do nothing; spread it <b>evenly</b> over drains, rain gardens, roof harvesting and pits at random spots (3 random plans); or let <b>HYDRA</b> place it by terrain, drainage connectivity and flood risk.</p>
         <div className="row-actions"><button className="btn accent" disabled={!!s.busy} onClick={s.run}>{sd ? 'Run again' : 'Run the showdown'}</button></div>
         <Progress />
       </Section>
-      {sd && !s.busy && (
-        <Section title="Result" aside={<CalcSourceTag source={sd.source} />}>
-          {headline}
-          <CompareBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
-          <p className="fine">Spent: even spread {fmtINR(sd.spreads.reduce((a, x) => a + x.cost, 0) / sd.spreads.length)} on average, HYDRA {fmtINR(sd.hydra.cost)}. HYDRA's mix: {mix(sd.hydra.plan).map(([t, n]) => `${n} ${CATALOG[t].short.toLowerCase()}`).join(', ')}.</p>
-          <div className="row-actions">
-            <button className="btn primary" onClick={() => { s.setPlan(sd.hydra.plan); useStore.setState({ panel: 'overview' }); }}>Use HYDRA's plan</button>
-            <button className="btn ghost" onClick={() => { s.setPlan(sd.spreads[0].plan); useStore.setState({ panel: 'overview' }); }}>Show an even-spread plan</button>
-          </div>
-        </Section>
+      {sd && d && !s.busy && (
+        <>
+          <StrategyVerdict d={d} place="storm" />
+          <StrategyCards d={d} />
+          <Section title="Outcome by metric" hint="bar = average, line = range of the random plans" aside={<CalcSourceTag source={sd.source} />}>
+            <GroupedBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
+            <div className="row-actions">
+              <button className="btn primary sm" onClick={() => { s.setPlan(sd.hydra.plan); useStore.setState({ panel: 'overview' }); }}>Use HYDRA's plan</button>
+              <button className="btn ghost sm" onClick={() => { s.setPlan(sd.spreads[0].plan); useStore.setState({ panel: 'overview' }); }}>Try an even spread</button>
+            </div>
+            <MoreLink section="strategies">Full comparison: every plan ranked, cost per result, spend mix</MoreLink>
+          </Section>
+        </>
       )}
     </>
   );
@@ -380,7 +377,10 @@ function PanelHead() {
   return (
     <div className="panel-head">
       <div><b>{site.name}</b><span>{site.city} · {cond}</span></div>
-      <span className={`status ${status[0]}`}>{status[1]}</span>
+      <div className="head-right">
+        <span className={`status ${status[0]}`}>{status[1]}</span>
+        <button className="head-btn" onClick={() => openAnalytics()} title="Full analytics (A)"><Icon name="chart" size={15} />Analytics</button>
+      </div>
     </div>
   );
 }

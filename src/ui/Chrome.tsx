@@ -38,6 +38,10 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     doc: <><path d="M5 2.5h7l3.5 3.5v11.5h-10.5z" /><path d="M12 2.5V6h3.5M7.5 10h5m-5 3h5" /></>,
     link: <><path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1" /><path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1" /></>,
     plus: <path d="M10 4v12M4 10h12" />,
+    chart: <><path d="M3 17h14" /><path d="M5.5 14V9m4 5V5m4 9v-3" /></>,
+    expand: <path d="M11 3h6v6M9 17H3v-6M17 3l-6 6M3 17l6-6" />,
+    download: <><path d="M10 3v10m-4-4l4 4 4-4" /><path d="M4 16h12" /></>,
+    print: <><path d="M6 8V3h8v5" /><path d="M5 14H3V8h14v6h-2" /><path d="M6 11h8v6H6z" /></>,
   };
   return <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{p[name]}</svg>;
 }

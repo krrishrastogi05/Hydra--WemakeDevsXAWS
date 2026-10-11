@@ -14,7 +14,10 @@ import { Icon } from '../Chrome';
 import { ShareReport } from '../Share';
 import { CalcSourceTag, ProgressBar } from '../calc';
 import { cellX, cellZ, half } from '../../three/geo';
-import { BudgetBreakdown, Empty, Metric, Optimize, Section, ValueRows, Verdict } from '../kit';
+import { BudgetBreakdown, Empty, Metric, MoreLink, Optimize, Section, ValueRows, Verdict, openAnalytics } from '../kit';
+import { GroupedBars } from '../viz';
+import { StrategyCards, StrategyVerdict } from '../analytics/common';
+import { heatStrat } from '../analytics/strat';
 
 const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 const pctTxt = (v: number) => `${Math.round(v * 100)}%`;
@@ -26,7 +29,7 @@ function HKpi({ label, base, after, fmt, hint, higherBetter = false }: { label: 
   return <Metric label={label} value={fmt(after ?? base)} hint={hint} base={fmt(base)} change={after == null ? undefined : `${Math.round(rel * 100)}%`} tone={diff > 1e-9 ? 'good' : diff < -1e-9 ? 'bad' : 'flat'} />;
 }
 
-function sunShare(r: HeatResult) {   // share of pedestrian space in direct sun at each step
+export function sunShare(r: HeatResult) {   // share of pedestrian space in direct sun at each step
   const n = r.n, ys = new Float32Array(r.steps.length);
   if (!r.frames) return ys;
   let ped = 0;
@@ -91,6 +94,7 @@ function Overview() {
           <HKpi label="Direct sun per spot" base={b.sunHours} after={a?.sunHours ?? null} fmt={v => `${num(v, 1)} h`} hint="Average hours of direct sun on pedestrian space in the window" />
           <HKpi label="Heat absorbed by roofs" base={b.roofHeat} after={a?.roofHeat ?? null} fmt={v => `${num(v, 0)} MWh`} hint="Solar heat soaked up by all roofs in the window; cool roofs cut this" />
         </div>
+        <MoreLink section="summary">Full analytics: sun through the day, exposure, every place</MoreLink>
       </Section>
     </div>
   );
@@ -108,6 +112,11 @@ function Analytics() {
   return (
     <div className="tab">
       <Status />
+      <button className="promo" onClick={() => openAnalytics('timeline')}>
+        <span className="promo-icon"><Icon name="chart" size={20} /></span>
+        <span><b>Open full analytics</b><small>Sun height and sunlight through the day, exposure and sun-hour distributions, every place people wait, cost against benefit and strategy comparison, with CSV export.</small></span>
+        <Icon name="expand" size={14} />
+      </button>
       <Section title="Pedestrian space in direct sun" hint="through the day">
         {baseSun && <LineSeries unit="%" fmt={v => `${Math.round(v)}%`} xLabel="time of day" xFmt={v => clock(v + DAY_START)} series={[
           { key: 'none', xs, ys: baseSun }, ...(planSun ? [{ key: 'plan' as const, xs, ys: planSun }] : []),
@@ -137,7 +146,7 @@ function PlanCost() {
   const b = s.baseline.metrics, a = run?.metrics;
   return (
     <div className="tab">
-      <Section title="Budget" hint="heat budget, separate from flood"><BudgetBreakdown spent={spent} budget={s.budget} parts={parts} note="Illustrative 2024 rates, not a schedule of rates. Trees are modelled at maturity, which takes years." /></Section>
+      <Section title="Budget" hint="heat budget, separate from flood" aside={<MoreLink section="cost">Cost analysis</MoreLink>}><BudgetBreakdown spent={spent} budget={s.budget} parts={parts} note="Illustrative 2024 rates, not a schedule of rates. Trees are modelled at maturity, which takes years." /></Section>
       {s.plan.length > 0 && (
         <Section title="Value for money" hint={a ? 'from the latest run of this plan' : 'run the day with this plan to see it'}>
           {a ? <ValueRows rows={[
@@ -238,39 +247,27 @@ function Showdown() {
   const grid = useStore(s => s.grid);
   const s = useHeat(useShallow(st => ({ budget: st.budget, sd: st.showdown, busy: st.busy, run: st.runShowdown, setPlan: st.setPlan })));
   if (!grid) return null;
-  const sd = s.sd;
-  let headline = null;
-  if (sd) {
-    const avg = (k: keyof HeatMetrics) => sd.spreads.reduce((a, x) => a + x.metrics[k], 0) / sd.spreads.length;
-    const coolH = sd.base.hotReceptors - sd.hydra.metrics.hotReceptors, coolS = sd.base.hotReceptors - avg('hotReceptors');
-    const shadeH = (sd.hydra.metrics.receptorShade - sd.base.receptorShade) * 100, shadeS = (avg('receptorShade') - sd.base.receptorShade) * 100;
-    headline = (
-      <>
-        <div className="headline">
-          <div><b>{num(Math.max(0, coolH))}</b><span>high-exposure places brought below {P.high} by HYDRA's plan</span></div>
-          <div><b>{num(Math.max(0, coolS), 1)}</b><span>by an even spread of the same {fmtINR(sd.budget)}</span></div>
-        </div>
-        <p className="sub">Shade where people wait rises by <b>{num(shadeH, 0)} points</b> with HYDRA against <b>{num(shadeS, 1)}</b> for the even spread. Same weather, same hours, same budget: only the placement differs.</p>
-      </>
-    );
-  }
+  const sd = s.sd, d = heatStrat(sd, grid);
   return (
     <>
       <Section title="Budget showdown" hint={`same day, same ${fmtINR(s.budget)}`}>
-        <p className="sub">Three strategies: do nothing; spend it <b>evenly</b> on trees and canopies at random street spots (average of 3 such plans, with their range); or let <b>HYDRA</b> place shade where the sun and the people are.</p>
+        <p className="sub">Three strategies for the same money: do nothing; spread it <b>evenly</b> on trees and canopies at random street spots (3 random plans); or let <b>HYDRA</b> place shade where the sun and the people are.</p>
         <div className="row-actions"><button className="btn accent" disabled={!!s.busy} onClick={s.run}>{sd ? 'Run again' : 'Run the showdown'}</button></div>
         <Progress />
       </Section>
-      {sd && !s.busy && (
-        <Section title="Result" aside={<CalcSourceTag source={sd.source} />}>
-          {headline}
-          <CompareBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
-          <p className="fine">Spent: even spread {fmtINR(sd.spreads.reduce((a, x) => a + x.cost, 0) / sd.spreads.length)} on average, HYDRA {fmtINR(sd.hydra.cost)}. HYDRA's mix: {mix(sd.hydra.plan).map(([t, n]) => `${n} ${HEAT_CATALOG[t].short.toLowerCase()}${n > 1 ? 's' : ''}`).join(', ')}.</p>
-          <div className="row-actions">
-            <button className="btn primary" onClick={() => { s.setPlan(sd.hydra.plan); useStore.setState({ panel: 'overview' }); }}>Use HYDRA's plan</button>
-            <button className="btn ghost" onClick={() => { s.setPlan(sd.spreads[0].plan); useStore.setState({ panel: 'overview' }); }}>Show an even-spread plan</button>
-          </div>
-        </Section>
+      {sd && d && !s.busy && (
+        <>
+          <StrategyVerdict d={d} place="day" />
+          <StrategyCards d={d} />
+          <Section title="Outcome by metric" hint="bar = average, line = range of the random plans" aside={<CalcSourceTag source={sd.source} />}>
+            <GroupedBars keys={['none', 'spread', 'hydra']} rows={rows(sd.base, sd.hydra.metrics, sd.spreads.map(x => x.metrics))} />
+            <div className="row-actions">
+              <button className="btn primary sm" onClick={() => { s.setPlan(sd.hydra.plan); useStore.setState({ panel: 'overview' }); }}>Use HYDRA's plan</button>
+              <button className="btn ghost sm" onClick={() => { s.setPlan(sd.spreads[0].plan); useStore.setState({ panel: 'overview' }); }}>Try an even spread</button>
+            </div>
+            <MoreLink section="strategies">Full comparison: every plan ranked, cost per result, spend mix</MoreLink>
+          </Section>
+        </>
       )}
     </>
   );

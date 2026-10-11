@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { fmtINR } from '../sim/grid';
 import { useStore, type OptimizeView } from '../store';
-import { SubTabs } from './Chrome';
+import { Icon, SubTabs } from './Chrome';
 
 export const num = (v: number, d = 0) => v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
 
@@ -102,4 +102,10 @@ export function Optimize({ recommend, showdown }: { recommend: ReactNode; showdo
       {view === 'recommend' ? recommend : showdown}
     </div>
   );
+}
+
+/** Opens the full analytics view at a section. */
+export const openAnalytics = (section = 'summary') => useStore.setState({ analytics: section });
+export function MoreLink({ section, children }: { section: string; children: ReactNode }) {
+  return <button className="link more" onClick={() => openAnalytics(section)}>{children} <Icon name="expand" size={12} /></button>;
 }
