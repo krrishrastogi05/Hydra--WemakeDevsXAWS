@@ -25,7 +25,8 @@ interface HeatState {
   runBaseline: () => Promise<void>; runPlan: (show?: boolean) => Promise<void>;
   add: (iv: Omit<HeatIntervention, 'id'>) => boolean; remove: (id: string) => void; undo: () => void; clearPlan: () => void;
   setPlan: (plan: HeatIntervention[]) => void;
-  recommend: (mode: 'fresh' | 'fill') => Promise<void>; runShowdown: () => Promise<void>;
+  /** 'auto' builds on the current plan when there is one. */
+  recommend: (mode?: 'fresh' | 'fill' | 'auto') => Promise<void>; runShowdown: () => Promise<void>;
 }
 
 export const heatPlanKey = (plan: HeatIntervention[]) => plan.map(p => p.id).join('|');
@@ -94,15 +95,16 @@ export const useHeat = create<HeatState>((set, get) => ({
     const cost = heatCostOf(grid, iv), spent = heatPlanCost(grid, plan);
     if (spent + cost > budget) { notify(`Over budget: ${HEAT_CATALOG[iv.type].name} costs ${fmtINR(cost)}, only ${fmtINR(budget - spent)} left`, 'error'); return false; }
     set({ plan: [...plan, iv], undoStack: [...get().undoStack, plan].slice(-50) });
+    heatPlanChanged();
     return true;
   },
-  remove: id => { const { plan } = get(); set({ plan: plan.filter(p => p.id !== id), undoStack: [...get().undoStack, plan].slice(-50) }); },
-  undo: () => { const st = get().undoStack; if (!st.length) return; set({ plan: st[st.length - 1], undoStack: st.slice(0, -1) }); },
-  clearPlan: () => { const { plan } = get(); if (!plan.length) return; set({ plan: [], undoStack: [...get().undoStack, plan], current: get().baseline, currentKey: '', view: 'baseline' }); },
-  setPlan: plan => { set({ plan, undoStack: [...get().undoStack, get().plan].slice(-50) }); get().runPlan(true); },
+  remove: id => { const { plan } = get(); set({ plan: plan.filter(p => p.id !== id), undoStack: [...get().undoStack, plan].slice(-50) }); heatPlanChanged(); },
+  undo: () => { const st = get().undoStack; if (!st.length) return; set({ plan: st[st.length - 1], undoStack: st.slice(0, -1) }); heatPlanChanged(); },
+  clearPlan: () => { const { plan } = get(); if (!plan.length) return; set({ plan: [], undoStack: [...get().undoStack, plan] }); heatPlanChanged(); },
+  setPlan: plan => { clearTimeout(heatRunTimer); set({ plan, undoStack: [...get().undoStack, get().plan].slice(-50) }); get().runPlan(true); },
 
-  recommend: async mode => {
-    const s = get();
+  recommend: async (want = 'auto') => {
+    const s = get(), mode = want === 'auto' ? (s.plan.length ? 'fill' : 'fresh') : want;
     set({ busy: { p: 0, msg: 'Starting the shade optimizer…' } });
     useStore.setState({ panel: 'recommend' });
     try {
@@ -126,3 +128,15 @@ useStore.subscribe((s, prev) => {
   if (s.site && s.site !== prev.site) { useHeat.setState({ siteId: '', heat: null, ...fresh }); if (s.mode === 'heat') useHeat.getState().ensure(); }
   else if (s.mode === 'heat' && prev.mode !== 'heat') useHeat.getState().ensure();
 });
+
+/** Results follow the plan as it is now: re-run the day shortly after an edit (quick successive edits run once). */
+let heatRunTimer: ReturnType<typeof setTimeout> | undefined;
+function heatPlanChanged() {
+  clearTimeout(heatRunTimer);
+  const h = useHeat.getState();
+  if (!h.plan.length) { useHeat.setState({ current: h.baseline, currentKey: '', view: 'baseline' }); return; }
+  heatRunTimer = setTimeout(() => {
+    const st = useHeat.getState();
+    if (st.plan.length && heatPlanKey(st.plan) !== st.currentKey) st.runPlan(false);
+  }, 400);
+}

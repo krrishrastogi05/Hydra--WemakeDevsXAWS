@@ -28,7 +28,7 @@ interface State {
   view: 'plan' | 'baseline'; peak: boolean; time: number; playing: boolean; speed: number;
   overlay: 'none' | 'risk' | 'sources'; showLabels: boolean; showDrains: boolean;
   panel: Panel; busy: { p: number; msg: string } | null;
-  recommendation: OptimizeResult | null; showdown: ShowdownResult | null;
+  recommendation: Recommendation | null; showdown: ShowdownResult | null;
   toast: { msg: string; kind: 'info' | 'error' } | null; flyTo: { x: number; z: number; t: number } | null;
   onboarding: boolean; addArea: boolean;
   quality: Quality; qualityChosen: boolean; setQuality: (q: Quality) => void;
@@ -40,15 +40,24 @@ interface State {
   runBaseline: () => Promise<void>; runPlan: (autoplay?: boolean) => Promise<void>;
   add: (iv: Omit<Intervention, 'id'>) => boolean; remove: (id: string) => void; undo: () => void; clearPlan: () => void;
   setPlan: (plan: Intervention[]) => void;
-  recommend: (mode: 'fresh' | 'fill') => Promise<void>; runShowdown: () => Promise<void>;
+  /** 'fill' keeps the current plan and spends what is left; 'fresh' plans the whole budget; 'auto' fills when there is a plan. */
+  recommend: (mode?: 'fresh' | 'fill' | 'auto') => Promise<void>; runShowdown: () => Promise<void>;
   notify: (msg: string, kind?: 'info' | 'error') => void;
   set: (p: Partial<State>) => void;
 }
 
 export const planKey = (plan: Intervention[]) => plan.map(p => p.id).join('|');
+/** A recommendation, and what it was made for: the storm, soil, budget and the plan it built on. */
+export type Recommendation = OptimizeResult & { mode: 'fresh' | 'fill'; forKey: string; basePlan: Intervention[] };
+/** The conditions a recommendation depends on; when this changes, the recommendation is out of date. */
+export const recKey = (s: Pick<State, 'siteId' | 'stormId' | 'antecedent' | 'budget' | 'plan'>, mode: 'fresh' | 'fill') =>
+  `${s.siteId}|${s.stormId}|${s.antecedent}|${s.budget}|${mode === 'fill' ? planKey(s.plan) : ''}`;
+/** Below this, there is not enough budget left for the optimizer to place anything useful. */
+export const MIN_FILL = 20000;
 export const simOptions = (s: Pick<State, 'stormId' | 'antecedent'>, keepFrames = true): SimOptions => floodRunOptions(s.stormId, s.antecedent, keepFrames);
 const condKey = (s: Pick<State, 'siteId' | 'stormId' | 'antecedent'>) => `${s.siteId}|${s.stormId}|${s.antecedent}`;
-let ivSeq = 0, baselineSeq = 0;
+let ivSeq = 0, baselineSeq = 0, recSeq = 0;
+let autoRunTimer: ReturnType<typeof setTimeout> | undefined;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const modeFromUrl = (): Mode => (location.hash.split('/')[1] === 'heat' || new URLSearchParams(location.search).get('mode') === 'heat' ? 'heat' : 'flood');
@@ -152,27 +161,40 @@ export const useStore = create<State>((set, get) => ({
     const cost = costOf(grid, iv), spent = planCost(grid, plan);
     if (spent + cost > budget) { get().notify(`Over budget: ${CATALOG[iv.type].name} costs ₹${Math.round(cost).toLocaleString('en-IN')}, only ₹${Math.round(budget - spent).toLocaleString('en-IN')} left`, 'error'); return false; }
     set({ plan: [...plan, iv], undoStack: [...get().undoStack, plan].slice(-50) });
+    planChanged();
     return true;
   },
-  remove: id => { const { plan } = get(); set({ plan: plan.filter(p => p.id !== id), undoStack: [...get().undoStack, plan].slice(-50) }); },
-  undo: () => { const st = get().undoStack; if (!st.length) return; set({ plan: st[st.length - 1], undoStack: st.slice(0, -1) }); },
-  clearPlan: () => { const { plan } = get(); if (!plan.length) return; set({ plan: [], undoStack: [...get().undoStack, plan], current: get().baseline, currentKey: '', view: 'baseline' }); },
-  setPlan: plan => { set({ plan, undoStack: [...get().undoStack, get().plan].slice(-50) }); get().runPlan(true); },
+  remove: id => { const { plan } = get(); set({ plan: plan.filter(p => p.id !== id), undoStack: [...get().undoStack, plan].slice(-50) }); planChanged(); },
+  undo: () => { const st = get().undoStack; if (!st.length) return; set({ plan: st[st.length - 1], undoStack: st.slice(0, -1) }); planChanged(); },
+  clearPlan: () => { const { plan } = get(); if (!plan.length) return; set({ plan: [], undoStack: [...get().undoStack, plan] }); planChanged(); },
+  setPlan: plan => { clearTimeout(autoRunTimer); set({ plan, undoStack: [...get().undoStack, get().plan].slice(-50) }); if (plan.length) get().runPlan(true); else planChanged(); },
 
-  recommend: async mode => {
-    const s = get();
-    set({ busy: { p: 0, msg: 'Starting the optimizer…' }, panel: 'recommend' });
+  recommend: async (want = 'auto') => {
+    const s = get(), grid = s.grid;
+    if (!grid) return;
+    // always plan from the plan as it is right now: build on it unless asked to start over
+    const left = s.budget - planCost(grid, s.plan);
+    const mode = want === 'auto' ? (s.plan.length ? 'fill' : 'fresh') : want;
+    if (mode === 'fill' && left < MIN_FILL) {
+      set({ panel: 'recommend' });
+      get().notify(`Your plan already uses the budget (₹${Math.round(Math.max(0, left)).toLocaleString('en-IN')} left). Raise the budget, or plan from scratch.`, 'error');
+      return;
+    }
+    const base = mode === 'fill' ? s.plan : [], forKey = recKey(s, mode), seq = ++recSeq;
+    set({ busy: { p: 0, msg: mode === 'fill' ? `Building on your ${base.length} interventions…` : 'Starting the optimizer…' }, panel: 'recommend' });
     try {
-      const rec = await engine.optimize(s.budget, mode === 'fill' ? s.plan : [], simOptions(s, false), (p, msg) => set({ busy: { p, msg } }));
-      set({ recommendation: rec, busy: null });
-    } catch (e) { set({ busy: null }); get().notify((e as Error).message, 'error'); }
+      const rec = await engine.optimize(s.budget, base, simOptions(s, false), (p, msg) => { if (seq === recSeq) set({ busy: { p, msg } }); });
+      if (seq !== recSeq) return;   // a newer request replaced this one
+      set({ recommendation: { ...rec, mode, forKey, basePlan: base }, busy: null });
+    } catch (e) { if (seq === recSeq) { set({ busy: null }); get().notify((e as Error).message, 'error'); } }
   },
   runShowdown: async () => {
-    const s = get();
+    const s = get(), cond = `${condKey(s)}|${s.budget}`;
     set({ busy: { p: 0, msg: 'Setting up the showdown…' }, panel: 'showdown' });
     try {
       const sd = await engine.showdown(s.budget, simOptions(s, false), (p, msg) => set({ busy: { p, msg } }));
-      set({ showdown: sd, busy: null });
+      const now = get();
+      set({ showdown: `${condKey(now)}|${now.budget}` === cond ? sd : null, busy: null });
     } catch (e) { set({ busy: null }); get().notify((e as Error).message, 'error'); }
   },
 }));
@@ -182,4 +204,15 @@ export const isFloodTool = (t: Tool): t is InterventionType => t in CATALOG;
 export function footprintFor(tool: Tool, grid: Grid, cell: number): number[] {
   if (tool === 'garden') return gardenFootprint(grid, cell);
   return [cell];
+}
+
+/** The results always follow the plan as it is now: re-run the storm shortly after an edit (edits in quick succession run once). */
+function planChanged() {
+  clearTimeout(autoRunTimer);
+  const s = useStore.getState();
+  if (!s.plan.length) { s.set({ current: s.baseline, currentKey: '', view: 'baseline' }); return; }
+  autoRunTimer = setTimeout(() => {
+    const st = useStore.getState();
+    if (st.plan.length && planKey(st.plan) !== st.currentKey) st.runPlan(false);
+  }, 400);
 }

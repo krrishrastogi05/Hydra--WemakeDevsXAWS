@@ -31,7 +31,7 @@ export function HeatControls() {
       <button className="btn primary" disabled={s.running || !s.ready} onClick={() => (s.plan.length ? s.runPlan(true) : useHeat.setState({ summary: false, hour: 7, playing: true, view: 'baseline' }))}>
         <Icon name="play" size={14} />{s.running ? 'Tracing…' : s.plan.length ? 'Run the day' : 'Play the day'}{stale && <i className="dot" title="Plan changed since the last run" />}
       </button>
-      <button className="btn" disabled={!!s.busy || !s.ready} onClick={() => s.recommend('fresh')}>Recommend</button>
+      <button className="btn" disabled={!!s.busy || !s.ready} onClick={() => s.recommend()} title="Builds on your current plan when you have one">Recommend</button>
       <button className="btn accent" disabled={!!s.busy || !s.ready} onClick={() => s.runShowdown()}>Budget showdown</button>
     </>
   );

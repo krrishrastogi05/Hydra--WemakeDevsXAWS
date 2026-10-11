@@ -78,7 +78,7 @@ function FloodControls() {
       <button className="btn primary" disabled={s.running || !s.grid} onClick={() => (s.plan.length ? s.runPlan(true) : useStore.setState({ time: 0, playing: true, peak: false, view: 'baseline' }))}>
         <Icon name="play" size={14} />{s.running ? 'Simulating…' : 'Run storm'}{stale && <i className="dot" title="Plan changed since the last run" />}
       </button>
-      <button className="btn" disabled={!!s.busy} onClick={() => s.recommend('fresh')}>Recommend</button>
+      <button className="btn" disabled={!!s.busy} onClick={() => s.recommend()} title={s.plan.length ? 'Build on your current plan with the budget that is left' : `Let HYDRA plan ${fmtINR(s.budget)}`}>Recommend</button>
       <button className="btn accent" disabled={!!s.busy} onClick={() => s.runShowdown()}>Budget showdown</button>
     </>
   );

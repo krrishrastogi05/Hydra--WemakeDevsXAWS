@@ -1,7 +1,7 @@
 // Right-hand panel: results, plan, recommendations, the budget showdown, and assumptions.
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useStore, planKey, type Panel as PanelId } from '../store';
+import { useStore, planKey, recKey, MIN_FILL, type Panel as PanelId } from '../store';
 import { fmtINR, type Grid } from '../sim/grid';
 import { CATALOG, PARAMS, STORMS, costOf, planCost } from '../sim/flood/model';
 import type { Intervention, InterventionType, Metrics, SimResult } from '../sim/flood/types';
@@ -84,8 +84,8 @@ function Results() {
     <div className="tab">
       <p className="sub">{storm.name}: {storm.note}</p>
       <CalcSourceTag source={shown.source} />
-      {stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)} disabled={s.running}>Run the same storm again</button> to update these numbers.</div>}
-      {s.running && <div className="callout soft">Recalculating for {storm.name.toLowerCase()}…</div>}
+      {s.running ? <div className="callout soft">Recalculating {stale ? 'with your latest plan' : `for ${storm.name.toLowerCase()}`}…</div>
+        : stale && <div className="callout">Your plan changed. <button className="link" onClick={() => s.runPlan(true)}>Run the same storm again</button> to update these numbers.</div>}
       {!a && !s.plan.length && <div className="callout soft">These are the results with <b>no action</b>. Place interventions, or press <b>Recommend</b>, then run the same storm to compare.</div>}
       <LiveNow shown={shown} base={shown !== s.baseline ? s.baseline : null} />
       <SubTabs tabs={RESULT_TABS} active={sub} onChange={setSub} />
@@ -187,40 +187,58 @@ function mix(plan: Intervention[]) {
 }
 
 function RecommendTab() {
-  const s = useStore(useShallow(st => ({ grid: st.grid, baseline: st.baseline, budget: st.budget, plan: st.plan, rec: st.recommendation, busy: st.busy, recommend: st.recommend, setPlan: st.setPlan })));
+  const s = useStore(useShallow(st => ({ grid: st.grid, baseline: st.baseline, current: st.current, currentKey: st.currentKey, budget: st.budget, plan: st.plan, rec: st.recommendation, busy: st.busy, recommend: st.recommend, setPlan: st.setPlan,
+    siteId: st.siteId, stormId: st.stormId, antecedent: st.antecedent })));
   const g = s.grid;
   if (!g || !s.baseline) return null;
-  const b = s.baseline.metrics, r = s.rec, left = s.budget - planCost(g, s.plan);
+  const b = s.baseline.metrics, r = s.rec, spent = planCost(g, s.plan), left = s.budget - spent, hasPlan = s.plan.length > 0;
+  const canFill = left >= MIN_FILL;
+  // out of date when the storm, soil, budget, or (for a plan built on yours) your plan changed since it was made
+  const applied = !!r && planKey(r.plan) === planKey(s.plan);
+  const stale = !!r && !applied && r.forKey !== recKey(s, r.mode);
+  // your plan's numbers, when the storm has been run with it as it is now
+  const mine = hasPlan && s.current && s.currentKey === planKey(s.plan) ? s.current.metrics : null;
+  const added = r ? r.plan.length - r.basePlan.length : 0, newItems = r ? r.plan.slice(r.basePlan.length) : [];
   return (
     <div className="tab">
       <p className="sub">HYDRA simulates the storm, finds the low spots and overloaded drains that do the most harm (weighted by residents, road importance, schools and hospitals), traces where every drop of runoff ends up, and spends the budget where it removes the most harmful water per rupee. It then re-simulates and refines.</p>
+      <div className="budgetline">{hasPlan ? <>Your plan: <b>{s.plan.length}</b> interventions, {fmtINR(spent)} of {fmtINR(s.budget)} · {fmtINR(Math.max(0, left))} left</> : <>No plan yet · budget {fmtINR(s.budget)}</>}</div>
       <div className="row-actions">
-        <button className="btn primary" disabled={!!s.busy} onClick={() => s.recommend('fresh')}>Plan {fmtINR(s.budget)} from scratch</button>
-        <button className="btn" disabled={!!s.busy || !s.plan.length || left < 30000} onClick={() => s.recommend('fill')}>Add to my plan ({fmtINR(Math.max(0, left))} left)</button>
+        {hasPlan
+          ? <button className="btn primary" disabled={!!s.busy || !canFill} onClick={() => s.recommend('fill')} title={canFill ? 'Keeps everything in your plan and spends what is left' : 'Your plan already uses the budget: raise it in the top bar, or start over'}>Improve my plan ({fmtINR(Math.max(0, left))} left)</button>
+          : <button className="btn primary" disabled={!!s.busy} onClick={() => s.recommend('fresh')}>Plan {fmtINR(s.budget)} from scratch</button>}
+        {hasPlan && <button className="btn" disabled={!!s.busy} onClick={() => s.recommend('fresh')} title="Ignores your plan and plans the whole budget">Start over with {fmtINR(s.budget)}</button>}
       </div>
       <Progress />
       {r && !s.busy && (
         <>
-          <h4>Predicted result <small>({fmtINR(r.cost)} spent, {r.plan.length} interventions)</small></h4>
+          {stale && <div className="callout">Your plan, budget or storm changed since this recommendation. <button className="link" onClick={() => s.recommend(r.mode === 'fill' && hasPlan ? 'fill' : hasPlan ? 'auto' : 'fresh')}>Recommend again</button> for the current setup.</div>}
+          <h4>Predicted result <small>({r.mode === 'fill' ? `your ${r.basePlan.length} + ${added} new` : `${r.plan.length} interventions`}, {fmtINR(r.cost)} spent)</small></h4>
           <CalcSourceTag source={r.source} />
-          <CompareBars keys={['none', 'hydra']} rows={rows(b, r.metrics)} />
-          <div className="chips">{mix(r.plan).map(([t, n]) => <span key={t} style={{ ['--tc' as string]: CATALOG[t].color }}><i />{n} × {CATALOG[t].short}</span>)}</div>
-          <div className="row-actions"><button className="btn primary" onClick={() => { s.setPlan(r.plan); useStore.setState({ panel: 'results' }); }}>Apply and run the storm</button></div>
+          {added === 0 && r.mode === 'fill'
+            ? <div className="callout soft">HYDRA found nothing more worth buying with what is left: no remaining spot removes enough harmful water per rupee.</div>
+            : <CompareBars keys={mine && r.mode === 'fill' ? ['none', 'plan', 'hydra'] : ['none', 'hydra']} rows={rows(b, r.metrics, undefined, mine && r.mode === 'fill' ? mine : undefined)} />}
+          <div className="chips">{mix(newItems).map(([t, n]) => <span key={t} style={{ ['--tc' as string]: CATALOG[t].color }}><i />{n} × {CATALOG[t].short}</span>)}</div>
+          <div className="row-actions">
+            <button className="btn primary" disabled={applied || stale} onClick={() => { s.setPlan(r.plan); useStore.setState({ panel: 'results' }); }}>
+              {applied ? 'Applied: see Results' : r.mode === 'fill' ? 'Add these to my plan and run the storm' : hasPlan ? 'Replace my plan and run the storm' : 'Apply and run the storm'}
+            </button>
+          </div>
           <h4>Why these places</h4>
-          <ol className="reasons">{r.plan.filter(p => p.reason).slice(0, 14).map(p => <li key={p.id} style={{ ['--tc' as string]: CATALOG[p.type].color }}><b>{CATALOG[p.type].short}</b> {p.reason} <em>{fmtINR(costOf(g, p))}</em></li>)}</ol>
-          {r.plan.length > 14 && <p className="fine">…and {r.plan.length - 14} more in the Plan tab once applied.</p>}
+          <ol className="reasons">{newItems.filter(p => p.reason).slice(0, 14).map(p => <li key={p.id} style={{ ['--tc' as string]: CATALOG[p.type].color }}><b>{CATALOG[p.type].short}</b> {p.reason} <em>{fmtINR(costOf(g, p))}</em></li>)}</ol>
+          {newItems.length > 14 && <p className="fine">…and {newItems.length - 14} more in the Plan tab once applied.</p>}
         </>
       )}
     </div>
   );
 }
 
-function rows(b: Metrics, x: Metrics, spread?: Metrics[]): BarRow[] {
+function rows(b: Metrics, x: Metrics, spread?: Metrics[], mine?: Metrics): BarRow[] {
   const avg = (k: keyof Metrics) => (spread ? spread.reduce((a, m) => a + (m[k] as number), 0) / spread.length : undefined);
   const rng = (k: keyof Metrics, f = 1): [number, number] | undefined => (spread ? [Math.min(...spread.map(m => (m[k] as number) * f)), Math.max(...spread.map(m => (m[k] as number) * f))] : undefined);
   const r = (label: string, k: keyof Metrics, fmt: (v: number) => string, f = 1, hint?: string): BarRow => ({
     label, hint, fmt,
-    values: { none: (b[k] as number) * f, hydra: (x[k] as number) * f, ...(spread ? { spread: avg(k)! * f } : {}) },
+    values: { none: (b[k] as number) * f, hydra: (x[k] as number) * f, ...(spread ? { spread: avg(k)! * f } : {}), ...(mine ? { plan: (mine[k] as number) * f } : {}) },
     range: spread ? { spread: rng(k, f)! } : undefined,
   });
   return [
