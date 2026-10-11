@@ -6,7 +6,7 @@ import { fmtINR } from '../../sim/grid';
 import { HEAT_CATALOG, HEAT_PARAMS, HEAT_SCENARIOS, HEAT_WINDOWS, heatPlanCost } from '../../sim/heat/model';
 import type { HeatInterventionType } from '../../sim/heat/types';
 import { exposureColor } from '../../three/heat/HeatLayer';
-import { GraphicsToggle, Icon } from '../Chrome';
+import { BudgetMeter, GraphicsToggle, Icon, LegendShell } from '../Chrome';
 
 export const HEAT_BUDGETS = [5e5, 10e5, 25e5, 50e5, 1e7];
 
@@ -18,21 +18,19 @@ export function HeatControls() {
   const spent = grid ? heatPlanCost(grid, s.plan) : 0;
   return (
     <>
-      <label>Day<select value={s.scenarioId} onChange={e => s.setScenario(e.target.value)}>{HEAT_SCENARIOS.map(x => <option key={x.id} value={x.id}>{x.name} · {x.tempC} °C / {x.rh} %</option>)}</select></label>
-      <label>Hours<select value={s.windowId} onChange={e => s.setWindow(e.target.value)}>{HEAT_WINDOWS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-      <label>Budget<select value={s.budget} onChange={e => s.setBudget(+e.target.value)}>{HEAT_BUDGETS.map(b => <option key={b} value={b}>{fmtINR(b)}</option>)}</select></label>
-      <div className="meter" title={`${fmtINR(spent)} of ${fmtINR(s.budget)} committed`}>
-        <div className="meter-bar">{(Object.keys(HEAT_CATALOG) as HeatInterventionType[]).map(t => {
-          const v = grid ? heatPlanCost(grid, s.plan.filter(p => p.type === t)) : 0;
-          return v ? <i key={t} style={{ width: `${(v / s.budget) * 100}%`, background: HEAT_CATALOG[t].color }} /> : null;
-        })}</div>
-        <span>{fmtINR(spent)} <em>/ {fmtINR(s.budget)}</em></span>
+      <div className="scenario" role="group" aria-label="Scenario">
+        <label>Day<select value={s.scenarioId} onChange={e => s.setScenario(e.target.value)}>{HEAT_SCENARIOS.map(x => <option key={x.id} value={x.id}>{x.name} · {x.tempC} °C / {x.rh} %</option>)}</select></label>
+        <label>Hours<select value={s.windowId} onChange={e => s.setWindow(e.target.value)}>{HEAT_WINDOWS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        <label>Budget<select value={s.budget} onChange={e => s.setBudget(+e.target.value)}>{HEAT_BUDGETS.map(b => <option key={b} value={b}>{fmtINR(b)}</option>)}</select></label>
       </div>
-      <button className="btn primary" disabled={s.running || !s.ready} onClick={() => (s.plan.length ? s.runPlan(true) : useHeat.setState({ summary: false, hour: 7, playing: true, view: 'baseline' }))}>
-        <Icon name="play" size={14} />{s.running ? 'Tracing…' : s.plan.length ? 'Run the day' : 'Play the day'}{stale && <i className="dot" title="Plan changed since the last run" />}
-      </button>
-      <button className="btn" disabled={!!s.busy || !s.ready} onClick={() => s.recommend()} title="Builds on your current plan when you have one">Recommend</button>
-      <button className="btn accent" disabled={!!s.busy || !s.ready} onClick={() => s.runShowdown()}>Budget showdown</button>
+      <BudgetMeter spent={spent} budget={s.budget} parts={(Object.keys(HEAT_CATALOG) as HeatInterventionType[]).map(t => ({ color: HEAT_CATALOG[t].color, cost: grid ? heatPlanCost(grid, s.plan.filter(p => p.type === t)) : 0 }))} />
+      <div className="actions">
+        <button className="btn primary" disabled={s.running || !s.ready} onClick={() => (s.plan.length ? s.runPlan(true) : useHeat.setState({ summary: false, hour: 7, playing: true, view: 'baseline' }))}>
+          <Icon name="play" size={14} />{s.running ? 'Tracing…' : s.plan.length ? 'Run the day' : 'Play the day'}{stale && <i className="dot" title="Plan changed since the last run" />}
+        </button>
+        <button className="btn" disabled={!!s.busy || !s.ready} onClick={() => s.recommend()} title="Builds on your current plan when you have one">Recommend</button>
+        <button className="btn accent" disabled={!!s.busy || !s.ready} onClick={() => s.runShowdown()} title="Compare HYDRA's plan with spending the same money evenly">Showdown</button>
+      </div>
     </>
   );
 }
@@ -50,7 +48,7 @@ export function HeatLegend() {
   const h = useHeat(useShallow(st => ({ overlay: st.overlay, summary: st.summary })));
   const ramp = [30, 47, 63, 80].map(v => `rgb(${exposureColor(v).join(',')})`).join(', ');
   return (
-    <div className="maplegend">
+    <LegendShell>
       {h.summary ? (
         <>
           <div className="lg-title">Pedestrian heat exposure (index)</div>
@@ -72,6 +70,6 @@ export function HeatLegend() {
         <label><input type="checkbox" checked={s.showLabels} onChange={e => s.set({ showLabels: e.target.checked })} />Labels</label>
       </div>
       <GraphicsToggle />
-    </div>
+    </LegendShell>
   );
 }

@@ -1,5 +1,5 @@
 // Top bar, tool palette, budget meter, legend, toasts and the first-run guide.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore, planKey, type Mode, type Tool } from '../store';
 import { useBackend } from '../api';
@@ -44,6 +44,30 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
 
 const BUDGETS = [10e5, 25e5, 50e5, 75e5, 1e7, 2e7];
 
+/** Budget used, always visible in the top bar, split by intervention colour. */
+export function BudgetMeter({ spent, budget, parts }: { spent: number; budget: number; parts: { color: string; cost: number }[] }) {
+  const over = spent > budget;
+  return (
+    <div className="meter" title={`${fmtINR(spent)} of ${fmtINR(budget)} committed`}>
+      <span className="meter-label">Budget used <em className={over ? 'bad' : ''}>{budget > 0 ? Math.round((spent / budget) * 100) : 0}%</em></span>
+      <div className="meter-bar">{parts.map((p, k) => (p.cost ? <i key={k} style={{ width: `${(p.cost / Math.max(budget, spent)) * 100}%`, background: p.color }} /> : null))}</div>
+      <span className="meter-val">{fmtINR(spent)} <em>/ {fmtINR(budget)}</em></span>
+    </div>
+  );
+}
+
+/** The legend card; it collapses to its title so it can be kept out of the way of the map. */
+export function LegendShell({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('hydra-legend') !== 'closed'; } catch { return true; } });
+  const toggle = () => { setOpen(!open); try { localStorage.setItem('hydra-legend', open ? 'closed' : 'open'); } catch { /* private mode */ } };
+  return (
+    <div className={`maplegend${open ? '' : ' closed'}`}>
+      <button className="lg-head" onClick={toggle} aria-expanded={open}><span>Map legend</span><i aria-hidden>{open ? '–' : '+'}</i></button>
+      {open && <div className="lg-body">{children}</div>}
+    </div>
+  );
+}
+
 function ModeSwitch() {
   const mode = useStore(s => s.mode), setMode = useStore(s => s.setMode);
   const opt = (m: Mode, icon: string, label: string, hint: string) => (
@@ -65,21 +89,19 @@ function FloodControls() {
   const spent = s.grid ? planCost(s.grid, s.plan) : 0;
   return (
     <>
-      <label>Storm<select value={s.stormId} onChange={e => s.setStorm(e.target.value)}>{STORMS.map(st => <option key={st.id} value={st.id}>{st.name} · {st.totalMm} mm / {st.durationMin / 60} h</option>)}</select></label>
-      <label>Soil<select value={s.antecedent} onChange={e => s.setAntecedent(e.target.value as 'dry' | 'normal' | 'wet')}><option value="dry">Dry (early monsoon)</option><option value="normal">Normal</option><option value="wet">Wet (after days of rain)</option></select></label>
-      <label>Budget<select value={s.budget} onChange={e => s.setBudget(+e.target.value)}>{BUDGETS.map(b => <option key={b} value={b}>{fmtINR(b)}</option>)}</select></label>
-      <div className="meter" title={`${fmtINR(spent)} of ${fmtINR(s.budget)} committed`}>
-        <div className="meter-bar">{(Object.keys(CATALOG) as InterventionType[]).map(t => {
-          const v = s.grid ? planCost(s.grid, s.plan.filter(p => p.type === t)) : 0;
-          return v ? <i key={t} style={{ width: `${(v / s.budget) * 100}%`, background: CATALOG[t].color }} /> : null;
-        })}</div>
-        <span>{fmtINR(spent)} <em>/ {fmtINR(s.budget)}</em></span>
+      <div className="scenario" role="group" aria-label="Scenario">
+        <label>Storm<select value={s.stormId} onChange={e => s.setStorm(e.target.value)}>{STORMS.map(st => <option key={st.id} value={st.id}>{st.name} · {st.totalMm} mm / {st.durationMin / 60} h</option>)}</select></label>
+        <label>Soil<select value={s.antecedent} onChange={e => s.setAntecedent(e.target.value as 'dry' | 'normal' | 'wet')}><option value="dry">Dry (early monsoon)</option><option value="normal">Normal</option><option value="wet">Wet (after days of rain)</option></select></label>
+        <label>Budget<select value={s.budget} onChange={e => s.setBudget(+e.target.value)}>{BUDGETS.map(b => <option key={b} value={b}>{fmtINR(b)}</option>)}</select></label>
       </div>
-      <button className="btn primary" disabled={s.running || !s.grid} onClick={() => (s.plan.length ? s.runPlan(true) : useStore.setState({ time: 0, playing: true, peak: false, view: 'baseline' }))}>
-        <Icon name="play" size={14} />{s.running ? 'Simulating…' : 'Run storm'}{stale && <i className="dot" title="Plan changed since the last run" />}
-      </button>
-      <button className="btn" disabled={!!s.busy} onClick={() => s.recommend()} title={s.plan.length ? 'Build on your current plan with the budget that is left' : `Let HYDRA plan ${fmtINR(s.budget)}`}>Recommend</button>
-      <button className="btn accent" disabled={!!s.busy} onClick={() => s.runShowdown()}>Budget showdown</button>
+      <BudgetMeter spent={spent} budget={s.budget} parts={(Object.keys(CATALOG) as InterventionType[]).map(t => ({ color: CATALOG[t].color, cost: s.grid ? planCost(s.grid, s.plan.filter(p => p.type === t)) : 0 }))} />
+      <div className="actions">
+        <button className="btn primary" disabled={s.running || !s.grid} onClick={() => (s.plan.length ? s.runPlan(true) : useStore.setState({ time: 0, playing: true, peak: false, view: 'baseline' }))}>
+          <Icon name="play" size={14} />{s.running ? 'Simulating…' : 'Run storm'}{stale && <i className="dot" title="Plan changed since the last run" />}
+        </button>
+        <button className="btn" disabled={!!s.busy} onClick={() => s.recommend()} title={s.plan.length ? 'Build on your current plan with the budget that is left' : `Let HYDRA plan ${fmtINR(s.budget)}`}>Recommend</button>
+        <button className="btn accent" disabled={!!s.busy} onClick={() => s.runShowdown()} title="Compare HYDRA's plan with spending the same money evenly">Showdown</button>
+      </div>
     </>
   );
 }
@@ -167,7 +189,7 @@ export function MapLegend() {
 function FloodLegend() {
   const s = useStore(useShallow(st => ({ overlay: st.overlay, showLabels: st.showLabels, showDrains: st.showDrains, set: st.set })));
   return (
-    <div className="maplegend">
+    <LegendShell>
       <div className="lg-title">Water depth</div>
       <div className="ramp"><i /><span>1 cm</span><span>20 cm</span><span>45 cm+</span></div>
       <div className="lg-title">Buildings</div>
@@ -181,7 +203,7 @@ function FloodLegend() {
         <label><input type="checkbox" checked={s.showDrains} onChange={e => s.set({ showDrains: e.target.checked })} />Drains</label>
       </div>
       <GraphicsToggle />
-    </div>
+    </LegendShell>
   );
 }
 

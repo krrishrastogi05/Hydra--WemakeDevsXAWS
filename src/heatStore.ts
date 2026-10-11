@@ -59,7 +59,7 @@ export const useHeat = create<HeatState>((set, get) => ({
     if (demo && !demoDone && get().baseline) {
       demoDone = true;
       if (demo === 'showdown') get().runShowdown();
-      else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); useStore.setState({ panel: 'results' }); } }
+      else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); useStore.setState({ panel: 'overview' }); } }
     }
   },
 
@@ -106,7 +106,7 @@ export const useHeat = create<HeatState>((set, get) => ({
   recommend: async (want = 'auto') => {
     const s = get(), mode = want === 'auto' ? (s.plan.length ? 'fill' : 'fresh') : want;
     set({ busy: { p: 0, msg: 'Starting the shade optimizer…' } });
-    useStore.setState({ panel: 'recommend' });
+    useStore.setState({ panel: 'optimize', optimize: 'recommend' });
     try {
       const rec = await heatEngine.optimize(s.budget, mode === 'fill' ? s.plan : [], heatOptions(s, false), (p, msg) => set({ busy: { p, msg } }));
       set({ recommendation: rec, busy: null });
@@ -115,7 +115,7 @@ export const useHeat = create<HeatState>((set, get) => ({
   runShowdown: async () => {
     const s = get();
     set({ busy: { p: 0, msg: 'Setting up the showdown…' } });
-    useStore.setState({ panel: 'showdown' });
+    useStore.setState({ panel: 'optimize', optimize: 'showdown' });
     try {
       const sd = await heatEngine.showdown(s.budget, heatOptions(s, false), (p, msg) => set({ busy: { p, msg } }));
       set({ showdown: sd, busy: null });

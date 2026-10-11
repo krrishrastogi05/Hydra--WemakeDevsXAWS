@@ -15,7 +15,8 @@ import type { HeatInterventionType } from './sim/heat/types';
 export type Mode = 'flood' | 'heat';
 export type Tool = 'inspect' | InterventionType | HeatInterventionType | 'erase';
 export type Quality = 'high' | 'low';
-export type Panel = 'results' | 'plan' | 'recommend' | 'showdown' | 'about';
+export type Panel = 'overview' | 'analytics' | 'plan' | 'optimize' | 'about';
+export type OptimizeView = 'recommend' | 'showdown';
 export type Selection = { kind: 'cell'; cell: number } | { kind: 'building'; building: number } | null;
 
 interface State {
@@ -27,7 +28,7 @@ interface State {
   baseline: SimResult | null; current: SimResult | null; currentKey: string; running: boolean;
   view: 'plan' | 'baseline'; peak: boolean; time: number; playing: boolean; speed: number;
   overlay: 'none' | 'risk' | 'sources'; showLabels: boolean; showDrains: boolean;
-  panel: Panel; busy: { p: number; msg: string } | null;
+  panel: Panel; optimize: OptimizeView; busy: { p: number; msg: string } | null;
   recommendation: Recommendation | null; showdown: ShowdownResult | null;
   toast: { msg: string; kind: 'info' | 'error' } | null; flyTo: { x: number; z: number; t: number } | null;
   onboarding: boolean; addArea: boolean;
@@ -77,7 +78,7 @@ export const useStore = create<State>((set, get) => ({
   baseline: null, current: null, currentKey: '', running: false,
   view: 'baseline', peak: true, time: 0, playing: false, speed: 1,
   overlay: 'none', showLabels: true, showDrains: true,
-  panel: 'results', busy: null, recommendation: null, showdown: null,
+  panel: 'overview', optimize: 'recommend', busy: null, recommendation: null, showdown: null,
   toast: null, flyTo: null, addArea: false,
   onboarding: (() => { if (location.search.includes('noguide')) return false; try { return localStorage.getItem('hydra-onboarded') !== '1'; } catch { return true; } })(),
   quality: (() => { try { return localStorage.getItem('hydra-quality') === 'low' ? 'low' : 'high'; } catch { return 'high'; } })(),
@@ -106,7 +107,7 @@ export const useStore = create<State>((set, get) => ({
       // demo links: ?demo=showdown runs the budget showdown, ?demo=plan applies HYDRA's recommendation and plays the storm
       const demo = get().mode === 'flood' ? new URLSearchParams(location.search).get('demo') : null;   // heat demos: heatStore.ts
       if (demo === 'showdown') get().runShowdown();
-      else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); set({ panel: 'results' }); } }
+      else if (demo === 'plan') { await get().recommend('fresh'); const rec = get().recommendation; if (rec) { get().setPlan(rec.plan); set({ panel: 'overview' }); } }
     } catch (e) { set({ error: `Could not load site data: ${(e as Error).message}`, loading: null }); }
   },
 
@@ -176,12 +177,12 @@ export const useStore = create<State>((set, get) => ({
     const left = s.budget - planCost(grid, s.plan);
     const mode = want === 'auto' ? (s.plan.length ? 'fill' : 'fresh') : want;
     if (mode === 'fill' && left < MIN_FILL) {
-      set({ panel: 'recommend' });
+      set({ panel: 'optimize', optimize: 'recommend' });
       get().notify(`Your plan already uses the budget (₹${Math.round(Math.max(0, left)).toLocaleString('en-IN')} left). Raise the budget, or plan from scratch.`, 'error');
       return;
     }
     const base = mode === 'fill' ? s.plan : [], forKey = recKey(s, mode), seq = ++recSeq;
-    set({ busy: { p: 0, msg: mode === 'fill' ? `Building on your ${base.length} interventions…` : 'Starting the optimizer…' }, panel: 'recommend' });
+    set({ busy: { p: 0, msg: mode === 'fill' ? `Building on your ${base.length} interventions…` : 'Starting the optimizer…' }, panel: 'optimize', optimize: 'recommend' });
     try {
       const rec = await engine.optimize(s.budget, base, simOptions(s, false), (p, msg) => { if (seq === recSeq) set({ busy: { p, msg } }); });
       if (seq !== recSeq) return;   // a newer request replaced this one
@@ -190,7 +191,7 @@ export const useStore = create<State>((set, get) => ({
   },
   runShowdown: async () => {
     const s = get(), cond = `${condKey(s)}|${s.budget}`;
-    set({ busy: { p: 0, msg: 'Setting up the showdown…' }, panel: 'showdown' });
+    set({ busy: { p: 0, msg: 'Setting up the showdown…' }, panel: 'optimize', optimize: 'showdown' });
     try {
       const sd = await engine.showdown(s.budget, simOptions(s, false), (p, msg) => set({ busy: { p, msg } }));
       const now = get();
