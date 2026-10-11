@@ -42,7 +42,21 @@ These figures come from the simulation engine (see `src/sim/flood/optimizer.test
 - `/?demo=showdown#gurugram` runs the budget showdown on load.
 - `/?demo=plan#ranchi` applies HYDRA's recommended plan and plays the storm.
 - `/#chennai/heat` opens a neighbourhood in heat mode; `?demo=plan` and `?demo=showdown` work there too, for example `/?demo=plan#chennai/heat`.
-- Add `noguide` to skip the welcome card, for example `/?noguide&demo=showdown#chennai`.
+- `/?tour` starts the guided tour (it also opens by itself on a first visit); press `T` to replay it.
+- Add `noguide` to skip the tour and welcome card, for example `/?noguide&demo=showdown#chennai`.
+
+## What's new
+
+Recent work by Sarthak, in detail in **[SARTHAK_CHANGES.md](SARTHAK_CHANGES.md)**:
+
+- **Easier map navigation:** drag to rotate, Shift-drag or Space to pan, zoom towards the cursor.
+- **Placement previews** that stay visible over flood water, with the cost, or the reason a spot is not allowed.
+- **A cleaner side panel:** Overview, Analytics, Plan & cost (with value for money), and Optimize.
+- **A full analytics view (`A`):** timelines, distributions, drain load, hotspots, cost against benefit, strategy comparison, CSV export.
+- **A before/after split view** on the map.
+- **A guided tour** for first-time visitors.
+- **Saved plans compared side by side.**
+- **A one-click PDF report.**
 
 ## What you can do
 
