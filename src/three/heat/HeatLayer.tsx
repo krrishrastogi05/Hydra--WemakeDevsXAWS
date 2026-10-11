@@ -6,12 +6,13 @@ import * as THREE from 'three';
 import { useStore } from '../../store';
 import { useHeat } from '../../heatStore';
 import { COVER } from '../../sim/types';
-import type { Grid } from '../../sim/grid';
-import { DAY_START, HEAT_PARAMS, HEAT_SCENARIOS, STEP_H, validateHeat } from '../../sim/heat/model';
+import { fmtINR, type Grid } from '../../sim/grid';
+import { DAY_START, HEAT_CATALOG, HEAT_PARAMS, HEAT_SCENARIOS, STEP_H, heatCostOf, validateHeat } from '../../sim/heat/model';
 import { sunPosition } from '../../sim/heat/solar';
 import type { HeatIntervention, HeatResult, HeatSite } from '../../sim/heat/types';
 import { VE, cellX, cellY, cellZ, half } from '../geo';
 import { terrainGeometry } from '../Terrain';
+import { Beacon, GHOST_ORDER, GhostMat, NO, OK } from '../Ghost';
 
 /** Exposure ramp: pale yellow (mild) -> orange -> deep red (high). Shared with the legend. */
 export function exposureColor(v: number): [number, number, number] {
@@ -150,15 +151,20 @@ export function SiteTrees() {
   return <TreeField specs={specs} sources={sources} />;
 }
 
-function Shade({ grid, cells, color, opacity = 1 }: { grid: Grid; cells: number[]; color: string; opacity?: number }) {
+const ghostMat = (color: string, opacity: number) => <GhostMat color={color} opacity={opacity} />;
+function GroundMark({ grid, cell, color }: { grid: Grid; cell: number; color: string }) {
+  return <mesh geometry={box} position={[cellX(grid, cell), cellY(grid, cell) + 0.15, cellZ(grid, cell)]} scale={[grid.dx * 0.96, 0.3, grid.dx * 0.96]} renderOrder={GHOST_ORDER}>{ghostMat(color, 0.55)}</mesh>;
+}
+
+function Shade({ grid, cells, color, opacity = 1, ghost }: { grid: Grid; cells: number[]; color: string; opacity?: number; ghost?: boolean }) {
   return (
     <group>
       {cells.map(c => {
         const y = cellY(grid, c);
         return (
           <group key={c} position={[cellX(grid, c), y, cellZ(grid, c)]}>
-            <mesh geometry={box} position={[0, HEAT_PARAMS.canopyTop, 0]} scale={[grid.dx * 0.96, 0.25, grid.dx * 0.96]} castShadow={opacity === 1}>
-              <meshStandardMaterial color={color} roughness={0.6} transparent={opacity < 1} opacity={opacity} depthWrite={opacity === 1} />
+            <mesh geometry={box} position={[0, HEAT_PARAMS.canopyTop, 0]} scale={[grid.dx * 0.96, 0.25, grid.dx * 0.96]} castShadow={!ghost && opacity === 1} renderOrder={ghost ? GHOST_ORDER : 0}>
+              {ghost ? ghostMat(color, opacity) : <meshStandardMaterial color={color} roughness={0.6} transparent={opacity < 1} opacity={opacity} depthWrite={opacity === 1} />}
             </mesh>
             {opacity === 1 && [[-1, -1], [1, 1]].map(([a, b], k) => (
               <mesh key={k} geometry={box} position={[a * grid.dx * 0.42, HEAT_PARAMS.canopyTop / 2, b * grid.dx * 0.42]} scale={[0.18, HEAT_PARAMS.canopyTop, 0.18]}>
@@ -172,26 +178,35 @@ function Shade({ grid, cells, color, opacity = 1 }: { grid: Grid; cells: number[
   );
 }
 
-const TOOL_COLOR = { tree: '#4ade80', canopy: '#f59e0b', walkway: '#fb923c' } as const;
 
 export function HeatInterventions() {
   const grid = useStore(s => s.grid)!, tool = useStore(s => s.tool), hover = useStore(s => s.hover), draft = useStore(s => s.draft);
   const hs = useHeat(s => s.heat), plan = useHeat(s => s.plan);
   const ghost = useMemo(() => {
     if (!hs || !hover || hover.cell < 0 || (tool !== 'tree' && tool !== 'canopy' && tool !== 'walkway')) return null;
-    return { tool, cell: hover.cell, ok: !validateHeat(grid, hs, { id: 'g', type: tool, cells: [hover.cell] }, plan) };
+    const iv: HeatIntervention = { id: 'g', type: tool, cells: [hover.cell] }, err = validateHeat(grid, hs, iv, plan);
+    return { tool, cell: hover.cell, ok: !err, err, label: `${HEAT_CATALOG[tool].short} · ${fmtINR(heatCostOf(grid, iv))}` };
   }, [hs, hover, tool, grid, plan]);
-  const draftOk = useMemo(() => (hs && draft ? !validateHeat(grid, hs, { id: 'g', type: 'walkway', cells: draft }, plan) : true), [hs, draft, grid, plan]);
+  const draftErr = useMemo(() => (hs && draft ? validateHeat(grid, hs, { id: 'g', type: 'walkway', cells: draft }, plan) : null), [hs, draft, grid, plan]);
+  const draftOk = !draftErr;
+  const drawing = !!draft && tool === 'walkway';
+  const tip = drawing ? draft![draft!.length - 1] : ghost ? ghost.cell : -1, tipOk = drawing ? draftOk : !!ghost?.ok;
+  const label = drawing ? `Walkway · ${draft!.length * grid.dx} m · ${fmtINR(heatCostOf(grid, { id: 'g', type: 'walkway', cells: draft! }))}` : ghost?.label ?? '';
   return (
     <group>
       {plan.filter(p => p.type === 'canopy' || p.type === 'walkway').map(p => <Shade key={p.id} grid={grid} cells={p.cells!} color={p.type === 'canopy' ? '#e9a23b' : '#d9822b'} />)}
+      {ghost && !draft && <GroundMark grid={grid} cell={ghost.cell} color={ghost.ok ? OK : NO} />}
+      {tip >= 0 && <Beacon x={cellX(grid, tip)} y={cellY(grid, tip)} z={cellZ(grid, tip)} ok={tipOk} label={label} reason={drawing ? draftErr : ghost?.err} />}
       {ghost && ghost.tool === 'tree' && (
-        <mesh geometry={CROWN} position={[cellX(grid, ghost.cell), cellY(grid, ghost.cell) + 6, cellZ(grid, ghost.cell)]} scale={[3.5, 3, 3.5]}>
-          <meshBasicMaterial color={ghost.ok ? TOOL_COLOR.tree : '#ef4444'} transparent opacity={0.5} depthWrite={false} />
+        <mesh geometry={CROWN} position={[cellX(grid, ghost.cell), cellY(grid, ghost.cell) + 6, cellZ(grid, ghost.cell)]} scale={[3.5, 3, 3.5]} renderOrder={GHOST_ORDER}>
+          {ghostMat(ghost.ok ? OK : NO, 0.45)}
         </mesh>
       )}
-      {ghost && ghost.tool !== 'tree' && !draft && <Shade grid={grid} cells={[ghost.cell]} color={ghost.ok ? TOOL_COLOR[ghost.tool] : '#ef4444'} opacity={0.5} />}
-      {draft && tool === 'walkway' && <Shade grid={grid} cells={draft} color={draftOk ? TOOL_COLOR.walkway : '#ef4444'} opacity={0.6} />}
+      {ghost && ghost.tool !== 'tree' && !draft && <Shade grid={grid} cells={[ghost.cell]} color={ghost.ok ? OK : NO} opacity={0.45} ghost />}
+      {draft && tool === 'walkway' && <>
+        {draft.map(c => <GroundMark key={c} grid={grid} cell={c} color={draftOk ? OK : NO} />)}
+        <Shade grid={grid} cells={draft} color={draftOk ? OK : NO} opacity={0.5} ghost />
+      </>}
     </group>
   );
 }

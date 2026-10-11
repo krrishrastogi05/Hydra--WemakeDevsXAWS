@@ -269,6 +269,13 @@ kbd { font: 600 10px/1 var(--font); padding: 2px 5px; border-radius: 4px; border
 /* ---------- map labels (HTML in 3D) ---------- */
 .tag { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 500; white-space: nowrap; background: rgba(12, 18, 26, .6); border: 1px solid rgba(148, 178, 210, .2); color: var(--ink-2); user-select: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .tag-road { color: #e2e8f0; }
+/* placement pin: anchored at its bottom tip, which sits on the target */
+.ghost-pin { --pc: #4ade80; position: absolute; left: 0; bottom: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; white-space: nowrap; }
+.ghost-pin.no { --pc: #ef4444; }
+.ghost-pin i { position: relative; width: 2px; height: 28px; background: var(--pc); box-shadow: 0 0 6px var(--pc); }
+.ghost-pin i::after { content: ''; position: absolute; bottom: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 3px rgba(0,0,0,.35), 0 0 10px var(--pc); }
+.ghost-tag { padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #04121c; background: var(--pc); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.ghost-pin.no .ghost-tag { color: #fff; }
 .tag-place { color: #fde68a; font-weight: 600; }
 .tag-crit { color: #fecaca; border-color: rgba(248, 113, 113, .5); }
 .tag-hot { color: #fff; background: rgba(120, 28, 28, .82); border-color: rgba(240, 110, 110, .6); font-weight: 600; }
