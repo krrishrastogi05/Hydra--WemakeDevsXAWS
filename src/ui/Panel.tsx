@@ -232,7 +232,7 @@ function Recommend() {
   return (
     <>
       <Section title="Let HYDRA plan the budget" hint={hasPlan ? `your plan: ${s.plan.length} items, ${fmtINR(Math.max(0, left))} left` : `budget ${fmtINR(s.budget)}`}>
-        <p className="sub">HYDRA simulates the storm, finds the low spots and overloaded drains that do the most harm (weighted by residents, road importance, schools and hospitals), and spends the budget where it removes the most harmful water per rupee, then re-simulates and refines.</p>
+        <p className="sub">HYDRA simulates the storm, finds the low spots and overloaded drains that do the most harm (weighted by residents, road importance, schools and hospitals), and spends the budget where it removes the most harmful water per rupee. It then searches two ways (big rounds, and small verified steps) and keeps whichever plan removes more harm; every step is checked by re-running the storm.</p>
         <div className="row-actions">
           {hasPlan
             ? <button className="btn primary" disabled={!!s.busy || !canFill} onClick={() => s.recommend('fill')} title={canFill ? 'Keeps everything in your plan and spends what is left' : 'Your plan already uses the budget: raise it in the top bar, or start over'}>Improve my plan</button>
@@ -247,6 +247,9 @@ function Recommend() {
           {added === 0 && r.mode === 'fill'
             ? <p className="sub">HYDRA found nothing more worth buying with what is left: no remaining spot removes enough harmful water per rupee.</p>
             : <CompareBars keys={mine && r.mode === 'fill' ? ['none', 'plan', 'hydra'] : ['none', 'hydra']} rows={rows(b, r.metrics, undefined, mine && r.mode === 'fill' ? mine : undefined)} />}
+          {r.greedy && r.greedy.impact > r.metrics.impact + 1e-6 && (
+            <p className="fine">Refined search: flood impact {num(r.greedy.impact / Math.max(1e-9, b.impact) * 100)} → {num(r.metrics.impact / Math.max(1e-9, b.impact) * 100)} (no action = 100) compared with a single greedy pass; every change was checked by re-running the storm.</p>
+          )}
           <div className="chips">{mix(newItems).map(([t, n]) => <span key={t} style={{ ['--tc' as string]: CATALOG[t].color }}><i />{n} × {CATALOG[t].short}</span>)}</div>
           <div className="row-actions">
             <button className="btn primary" disabled={applied || stale} onClick={() => { s.setPlan(r.plan); useStore.setState({ panel: 'overview' }); }}>

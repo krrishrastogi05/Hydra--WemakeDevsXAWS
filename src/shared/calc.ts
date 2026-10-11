@@ -16,7 +16,8 @@ export type CalcSource = 'server' | 'browser';
 export interface FloodCalc { siteId: string; stormId: string; antecedent: Antecedent; plan: Intervention[]; budget?: number }
 export interface HeatCalc { siteId: string; scenarioId: string; windowId: string; plan: HeatIntervention[]; budget?: number }
 
-export interface OptimizeResult { plan: Intervention[]; metrics: Metrics; cost: number; rounds: number[]; source?: CalcSource }
+/** `greedy`: what the first, greedy stage reached before refinement (absent from an older API). */
+export interface OptimizeResult { plan: Intervention[]; metrics: Metrics; cost: number; rounds: number[]; greedy?: { impact: number; cost: number; items: number }; source?: CalcSource }
 export interface ShowdownResult {
   budget: number; base: Metrics;
   spreads: { plan: Intervention[]; cost: number; metrics: Metrics }[];
